@@ -25,3 +25,8 @@ erl_crash.dump
 # Ignore package tarball (built via "mix hex.build").
 hermes_orchestrator-*.tar
 
+
+# SQLite database
+data/*.db
+data/*.db-shm
+data/*.db-wal
