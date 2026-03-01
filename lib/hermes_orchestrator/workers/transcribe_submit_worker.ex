@@ -1,0 +1,36 @@
+defmodule HermesOrchestrator.Workers.TranscribeSubmitWorker do
+  use Oban.Worker, queue: :default, max_attempts: 3
+
+  alias HermesOrchestrator.{Repo, Pipeline}
+  alias HermesOrchestrator.{Clients.Whisper, Workers.TranscribePollWorker}
+
+  @impl Oban.Worker
+  def perform(%{args: %{"pipeline_id" => pid}}) do
+    pipeline = Repo.get!(Pipeline, pid)
+    collect  = Pipeline.get_results(pipeline)["collect"]
+    mp3_path = collect["mp3"]
+    duration = collect["duration_secs"] || 7200
+
+    deadline =
+      DateTime.utc_now()
+      |> DateTime.add(div(duration, 4) + 600, :second)
+      |> DateTime.to_iso8601()
+
+    case Whisper.submit(mp3_path) do
+      {:ok, wjid} ->
+        Pipeline.save_result(pipeline, "transcribe_submitted", %{"whisper_job_id" => wjid})
+
+        TranscribePollWorker.new(
+          %{"pipeline_id" => pid, "whisper_job_id" => wjid, "deadline" => deadline},
+          scheduled_in: 30
+        )
+        |> Oban.insert!()
+
+        :ok
+
+      {:error, reason} ->
+        Pipeline.fail(pipeline, reason)
+        {:error, reason}
+    end
+  end
+end
