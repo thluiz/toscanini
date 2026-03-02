@@ -1,9 +1,9 @@
 import Config
 
-config :hermes_orchestrator, HermesOrchestrator.Repo,
-  database: "/tmp/hermes_orchestrator_test.db"
+config :toscanini, Toscanini.Repo,
+  database: "/tmp/toscanini_test.db"
 
-config :hermes_orchestrator, HermesOrchestratorWeb.Endpoint,
+config :toscanini, ToscaniniWeb.Endpoint,
   http: [ip: {127, 0, 0, 1}, port: 4002],
   secret_key_base: "testsecretkey1234567890testsecretkey1234567890testsecretkey12345678"
 

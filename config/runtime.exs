@@ -1,7 +1,29 @@
 import Config
 
+# Database — path relativo ao WorkingDirectory do serviço por padrão.
+# Para mover o banco: setar TOSCANINI_DB_PATH no service file. Zero toque em Elixir.
+db_path = System.get_env("TOSCANINI_DB_PATH", "data/orchestrator.db")
+
+config :toscanini, Toscanini.Repo,
+  adapter: Ecto.Adapters.SQLite3,
+  database: db_path
+
+# Diretório de saída para MP3 e JSON coletados.
+# Para mover: setar TOSCANINI_COLLECTED_DIR no service file.
+config :toscanini, :collected_dir,
+  System.get_env("TOSCANINI_COLLECTED_DIR", "/home/hermes/collected")
+
+# API key do GossipGate para notificações Telegram.
+config :toscanini, :gossipgate_api_key,
+  System.get_env("GOSSIPGATE_API_KEY", "")
+
+# URL base dos serviços internos (via nginx). Nunca exposta em código.
+# Para apontar para outro host: setar HERMES_BASE_URL no service file.
+config :toscanini, :base_url,
+  System.get_env("HERMES_BASE_URL", "http://localhost:8080")
+
 if config_env() == :prod do
-  config :hermes_orchestrator, HermesOrchestratorWeb.Endpoint,
+  config :toscanini, ToscaniniWeb.Endpoint,
     http: [ip: {127, 0, 0, 1}, port: 8200],
     secret_key_base: System.fetch_env!("SECRET_KEY_BASE")
 end

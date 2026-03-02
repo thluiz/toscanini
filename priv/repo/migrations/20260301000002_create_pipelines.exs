@@ -1,4 +1,4 @@
-defmodule HermesOrchestrator.Repo.Migrations.CreatePipelines do
+defmodule Toscanini.Repo.Migrations.CreatePipelines do
   use Ecto.Migration
 
   def change do

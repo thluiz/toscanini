@@ -1,6 +1,6 @@
 import Config
 
-config :hermes_orchestrator, HermesOrchestratorWeb.Endpoint,
+config :toscanini, ToscaniniWeb.Endpoint,
   http: [ip: {127, 0, 0, 1}, port: 8200],
   check_origin: false,
   code_reloader: false,

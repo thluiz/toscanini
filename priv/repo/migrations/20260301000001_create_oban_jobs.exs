@@ -1,4 +1,4 @@
-defmodule HermesOrchestrator.Repo.Migrations.CreateObanJobs do
+defmodule Toscanini.Repo.Migrations.CreateObanJobs do
   use Ecto.Migration
 
   def up do

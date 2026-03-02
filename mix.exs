@@ -1,9 +1,9 @@
-defmodule HermesOrchestrator.MixProject do
+defmodule Toscanini.MixProject do
   use Mix.Project
 
   def project do
     [
-      app: :hermes_orchestrator,
+      app: :toscanini,
       version: "0.1.0",
       elixir: "~> 1.15",
       elixirc_paths: elixirc_paths(Mix.env()),
@@ -15,7 +15,7 @@ defmodule HermesOrchestrator.MixProject do
 
   def application do
     [
-      mod: {HermesOrchestrator.Application, []},
+      mod: {Toscanini.Application, []},
       extra_applications: [:logger, :runtime_tools]
     ]
   end

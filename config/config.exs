@@ -1,29 +1,22 @@
 import Config
 
-config :hermes_orchestrator,
-  ecto_repos: [HermesOrchestrator.Repo],
+config :toscanini,
+  ecto_repos: [Toscanini.Repo],
   generators: [timestamp_type: :utc_datetime]
 
-config :hermes_orchestrator, HermesOrchestratorWeb.Endpoint,
+config :toscanini, ToscaniniWeb.Endpoint,
   url: [host: "localhost"],
   adapter: Bandit.PhoenixAdapter,
   render_errors: [
-    formats: [json: HermesOrchestratorWeb.ErrorJSON],
+    formats: [json: ToscaniniWeb.ErrorJSON],
     layout: false
   ],
   server: true
 
-config :hermes_orchestrator, HermesOrchestrator.Repo,
-  adapter: Ecto.Adapters.SQLite3,
-  database: "/home/hermes/services/hermes_orchestrator/data/orchestrator.db"
-
-config :hermes_orchestrator, Oban,
+config :toscanini, Oban,
   engine: Oban.Engines.Lite,
-  repo: HermesOrchestrator.Repo,
+  repo: Toscanini.Repo,
   queues: [collectors: 3, digest: 1, default: 5]
-
-config :hermes_orchestrator, :base_url,
-  System.get_env("HERMES_BASE_URL", "http://localhost:8080")
 
 config :logger, :default_formatter,
   format: "$time $metadata[$level] $message\n",

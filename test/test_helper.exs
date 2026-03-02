@@ -1,2 +1,2 @@
 ExUnit.start()
-Ecto.Adapters.SQL.Sandbox.mode(HermesOrchestrator.Repo, :manual)
+Ecto.Adapters.SQL.Sandbox.mode(Toscanini.Repo, :manual)
