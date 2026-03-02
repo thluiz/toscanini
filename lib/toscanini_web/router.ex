@@ -8,8 +8,10 @@ defmodule ToscaniniWeb.Router do
   scope "/api/orchestrator", ToscaniniWeb do
     pipe_through :api
 
-    get  "/health",   HealthController, :index
-    post "/jobs",     JobController, :create
-    get  "/jobs/:id", JobController, :show
+    get  "/health",    HealthController, :index
+    post "/jobs",      JobController, :create
+    get  "/jobs/:id",  JobController, :show
+    post "/batch",     BatchController, :create
+    get  "/batch/:id", BatchController, :show
   end
 end

@@ -3,6 +3,7 @@ defmodule Toscanini.Workers.NotifyWorker do
 
   alias Toscanini.{Repo, Pipeline, Pipeline.Dispatcher}
   alias Toscanini.Clients.GossipGate
+  alias Toscanini.Workers.BatchAdvanceWorker
 
   # Telegram HTML message limit
   @max_chars 4000
@@ -28,6 +29,23 @@ defmodule Toscanini.Workers.NotifyWorker do
 
     Pipeline.save_result(pipeline, "notify", %{"done" => true})
     Dispatcher.advance(pid)
+
+    # Se pertence a um batch, avançar para o próximo episódio
+    params = Pipeline.get_params(pipeline)
+
+    case {params["batch_id"], params["batch_item_id"]} do
+      {nil, _} ->
+        :ok
+
+      {batch_id, item_id} when not is_nil(item_id) ->
+        BatchAdvanceWorker.new(%{
+          "batch_id"      => batch_id,
+          "batch_item_id" => item_id,
+          "result"        => "ok"
+        })
+        |> Oban.insert!()
+    end
+
     :ok
   end
 
