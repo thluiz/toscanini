@@ -21,30 +21,10 @@ defmodule Toscanini.Collectors.Pocketcasts do
 
   # 1. Seguir redirect para URL canónica com UUIDs (sem descarregar o body da página)
   defp fetch_metadata(url) do
-    # Tenta extrair UUIDs da URL original antes de seguir redirects.
-    # URLs pocketcasts.com/podcast/.../episode/... têm os UUIDs no path mas
-    # redirecionam para /discover — resolve_url retornaria uma URL sem UUIDs.
-    {resolved_url, podcast_uuid, episode_uuid} =
-      case extract_uuids(url) do
-        {:ok, p, e} when p != e ->
-          {url, p, e}
-        _ ->
-          case resolve_url(url) do
-            {:ok, final} ->
-              case extract_uuids(final) do
-                {:ok, p, e} when p != e -> {final, p, e}
-                _           -> fetch_og_url(final)
-              end
-            _ -> {url, nil, nil}
-          end
-      end
-
-    if is_nil(podcast_uuid) do
-      {:error, "nenhum UUID na URL: #{resolved_url}"}
-    else
-      with {:ok, ep, podcast_info} <- fetch_episode(podcast_uuid, episode_uuid) do
-        build_meta(ep, resolved_url, podcast_uuid, podcast_info)
-      end
+    with {:ok, final_url}                  <- resolve_url(url),
+         {:ok, podcast_uuid, episode_uuid} <- extract_uuids(final_url),
+         {:ok, ep, podcast_info} <- fetch_episode(podcast_uuid, episode_uuid) do
+      build_meta(ep, final_url, podcast_uuid, podcast_info)
     end
   end
 
@@ -253,23 +233,4 @@ defmodule Toscanini.Collectors.Pocketcasts do
       end)
     %{uri | path: encoded_path} |> URI.to_string()
   end
-
-  # Fallback para URLs como pca.st/episode/UUID onde só existe o episode UUID
-  # no path. Faz GET à página e extrai o og:url que contém ambos os UUIDs.
-  defp fetch_og_url(url) do
-    opts = [headers: [{"user-agent", "Mozilla/5.0"}]]
-    case Req.get(url, opts) do
-      {:ok, %{body: body}} when is_binary(body) ->
-        case Regex.run(~r/property="og:url"\s+content="([^"]+)"/, body) do
-          [_, og_url] ->
-            case extract_uuids(og_url) do
-              {:ok, p, e} when p != e -> {og_url, p, e}
-              _                       -> {url, nil, nil}
-            end
-          _ -> {url, nil, nil}
-        end
-      _ -> {url, nil, nil}
-    end
-  end
-
 end

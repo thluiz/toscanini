@@ -33,6 +33,23 @@ defmodule Toscanini.Pipeline do
   end
 
   def fail(pipeline, reason) do
-    pipeline |> changeset(%{status: "failed", error: reason}) |> Repo.update!()
+    updated = pipeline |> changeset(%{status: "failed", error: reason}) |> Repo.update!()
+
+    # Se pertence a um batch, avançar para o próximo episódio
+    params = get_params(pipeline)
+    case {params["batch_id"], params["batch_item_id"]} do
+      {nil, _} ->
+        :ok
+      {batch_id, item_id} when not is_nil(item_id) ->
+        Toscanini.Workers.BatchAdvanceWorker.new(%{
+          "batch_id"      => batch_id,
+          "batch_item_id" => item_id,
+          "result"        => "error",
+          "error"         => reason
+        })
+        |> Oban.insert!()
+    end
+
+    updated
   end
 end

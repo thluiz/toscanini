@@ -7,24 +7,24 @@ defmodule Toscanini.Workers.NotifyWorker do
 
   # Telegram HTML message limit
   @max_chars 4000
-  @vox_base_url "https://vox.thluiz.com"
 
   @impl Oban.Worker
   def perform(%{args: %{"pipeline_id" => pid}}) do
-    pipeline  = Repo.get!(Pipeline, pid)
-    collect   = Pipeline.get_results(pipeline)["collect"]
-    publish   = Pipeline.get_results(pipeline)["publish"] || %{}
-    json_path = collect["json"]
-    json_data = json_path |> File.read!() |> Jason.decode!()
+    pipeline    = Repo.get!(Pipeline, pid)
+    collect     = Pipeline.get_results(pipeline)["collect"]
+    write_files = Pipeline.get_results(pipeline)["write_files"] || %{}
+    json_path   = collect["json"]
+    json_data   = json_path |> File.read!() |> Jason.decode!()
 
     title       = json_data["title"] || collect["title"] || "Episódio"
     podcast     = get_in(json_data, ["metadata", "podcast"]) || ""
     duration    = get_in(json_data, ["metadata", "duration"]) || ""
     description = json_data["description"] || ""
     timeline    = json_data["timeline"] || []
-    vox_path    = publish["vox_path"]
+    vox_path    = write_files["vox_path"]
 
-    msg = build_message(title, podcast, duration, description, timeline, vox_path)
+    vox_base_url = Application.get_env(:toscanini, :vox_base_url, "https://vox.thluiz.com")
+    msg = build_message(title, podcast, duration, description, timeline, vox_path, vox_base_url)
     GossipGate.send(msg)
 
     Pipeline.save_result(pipeline, "notify", %{"done" => true})
@@ -49,7 +49,7 @@ defmodule Toscanini.Workers.NotifyWorker do
     :ok
   end
 
-  defp build_message(title, podcast, duration, description, timeline, vox_path) do
+  defp build_message(title, podcast, duration, description, timeline, vox_path, vox_base_url) do
     header = """
     ✅ <b>#{escape(title)}</b>
     <i>#{escape(podcast)}#{if duration != "", do: " · #{escape(duration)}", else: ""}</i>
@@ -67,7 +67,7 @@ defmodule Toscanini.Workers.NotifyWorker do
 
     url_block =
       if vox_path do
-        url = "#{@vox_base_url}/#{String.replace_suffix(vox_path, ".md", "")}"
+        url = "#{vox_base_url}/#{String.replace_suffix(vox_path, ".md", "")}"
         "\n🔗 <a href=\"#{url}\">#{escape(url)}</a>\n"
       else
         ""

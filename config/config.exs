@@ -16,7 +16,7 @@ config :toscanini, ToscaniniWeb.Endpoint,
 config :toscanini, Oban,
   engine: Oban.Engines.Lite,
   repo: Toscanini.Repo,
-  queues: [collectors: 3, digest: 1, default: 5]
+  queues: [collectors: 3, digest: 1, default: 5, git_commit: 1, vox_publish: 1, transcribe: 2]
 
 config :logger, :default_formatter,
   format: "$time $metadata[$level] $message\n",
