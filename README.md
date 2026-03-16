@@ -192,3 +192,10 @@ SQLite at `data/orchestrator.db`. Key tables:
 | `git_commit` | 1 | Sequential (avoid conflicts) |
 | `vox_publish` | 1 | Sequential (Quartz builds) |
 | `default` | 5 | Summarize, enrich, notify, etc. |
+
+## Security TODO
+
+- [ ] **No authentication on any endpoint** — all routes are open including `POST /publish/podcast` (writes files) and `PUT /scheduler/configs/:queue`. Fix: add auth Plug with `X-Api-Key` validation.
+- [ ] **LIKE wildcard injection** — `url` param interpolated into LIKE pattern without escaping `%`/`_` (`job_controller.ex:22`). Can suppress legitimate URL processing via false deduplication. Fix: use `json_extract(params, '$.url') = ?` or escape wildcards.
+- [ ] **SSRF via user URLs** — URLs from `POST /jobs` passed directly to `Req.get()` with redirect following (`collectors/pocketcasts.ex:56-83,175-183`). Fix: add URL allowlist for `pocketcasts.com`, `pca.st`, and known CDNs.
+- [ ] **No rate limiting** — no protection against job submission flooding. Add `PlugAttack` or token-bucket.
