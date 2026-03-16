@@ -69,7 +69,7 @@ defmodule Toscanini.Workers.BatchAdvanceWorker do
       if batch.failed == 0 do
         "✅ <b>Batch concluído</b> — #{batch.done}/#{batch.total} episódios publicados"
       else
-        "⚠️ <b>Batch concluído com erros</b> — #{batch.done} publicados, #{batch.failed} falhas"
+        "⚠️ <b>Batch concluído com erros</b> — #{batch.done} publicados, #{batch.failed} falhas (batch #{batch.id})"
       end
 
     failed_section =

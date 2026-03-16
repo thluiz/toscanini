@@ -1,0 +1,39 @@
+defmodule Toscanini.Workers.GitCommitWorker do
+  use Oban.Worker, queue: :git_commit, max_attempts: 3
+
+  alias Toscanini.{Repo, Pipeline, Pipeline.Dispatcher}
+
+  @impl Oban.Worker
+  def perform(%{args: %{"pipeline_id" => pid}}) do
+    vox_content_dir = System.fetch_env!("TOSCANINI_VOX_CONTENT_DIR")
+
+    pipeline    = Repo.get!(Pipeline, pid)
+    write_files = Pipeline.get_results(pipeline)["write_files"]
+    dest_json   = write_files["dest_json"]
+    dest_md     = write_files["dest_md"]
+    title       = write_files["title"] || "Episode"
+
+    {_out, 0} = System.cmd("git", ["add", dest_json, dest_md], cd: vox_content_dir)
+
+    {output, status} =
+      System.cmd("git", ["commit", "-m", "Add: #{title}"],
+        cd: vox_content_dir,
+        stderr_to_stdout: true
+      )
+
+    if status != 0 do
+      {:error, "git commit failed (#{status}): #{output}"}
+    else
+      {push_out, push_status} =
+        System.cmd("git", ["push"], cd: vox_content_dir, stderr_to_stdout: true)
+
+      if push_status != 0 do
+        {:error, "git push failed (#{push_status}): #{push_out}"}
+      else
+        Pipeline.save_result(pipeline, "git_commit", %{"done" => true, "output" => String.trim(output)})
+        Dispatcher.advance(pid)
+        :ok
+      end
+    end
+  end
+end

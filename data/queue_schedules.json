@@ -1,0 +1,25 @@
+{
+  "transcribe": [
+    {
+      "cores": 14,
+      "from": 0,
+      "gpu": true,
+      "limit": 3,
+      "to": 9
+    },
+    {
+      "cores": 22,
+      "from": 9,
+      "gpu": false,
+      "limit": 1,
+      "to": 20
+    },
+    {
+      "cores": 14,
+      "from": 20,
+      "gpu": true,
+      "limit": 3,
+      "to": 24
+    }
+  ]
+}

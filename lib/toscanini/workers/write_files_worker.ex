@@ -1,11 +1,13 @@
-defmodule Toscanini.Workers.PublishWorker do
+defmodule Toscanini.Workers.WriteFilesWorker do
   use Oban.Worker, queue: :default, max_attempts: 3
 
   alias Toscanini.{Repo, Pipeline, Pipeline.Dispatcher}
-  alias Toscanini.Clients.VoxIngest
+  alias Toscanini.VoxPocketcastJsonRenderer
 
   @impl Oban.Worker
   def perform(%{args: %{"pipeline_id" => pid}}) do
+    vox_content_dir = System.fetch_env!("TOSCANINI_VOX_CONTENT_DIR")
+
     pipeline  = Repo.get!(Pipeline, pid)
     collect   = Pipeline.get_results(pipeline)["collect"]
     json_path = collect["json"]
@@ -15,16 +17,27 @@ defmodule Toscanini.Workers.PublishWorker do
     published = get_in(json_data, ["metadata", "published"]) || ""
     vox_path  = build_vox_path(published, slug)
 
-    case VoxIngest.publish_json(vox_path, json_data) do
-      {:ok, _body} ->
-        Pipeline.save_result(pipeline, "publish", %{"done" => true, "vox_path" => vox_path})
-        Dispatcher.advance(pid)
-        :ok
+    base_path  = Path.join(vox_content_dir, Path.rootname(vox_path))
+    dest_json  = base_path <> ".json"
+    dest_md    = base_path <> ".md"
 
-      {:error, reason} ->
-        Pipeline.fail(pipeline, reason)
-        {:error, reason}
-    end
+    File.mkdir_p!(Path.dirname(dest_json))
+    File.write!(dest_json, Jason.encode!(json_data, pretty: true))
+
+    md_content = VoxPocketcastJsonRenderer.render(json_data)
+    File.write!(dest_md, md_content)
+
+    title = json_data["title"] || collect["title"] || slug
+
+    Pipeline.save_result(pipeline, "write_files", %{
+      "vox_path"  => vox_path,
+      "dest_json" => dest_json,
+      "dest_md"   => dest_md,
+      "title"     => title
+    })
+
+    Dispatcher.advance(pid)
+    :ok
   end
 
   defp build_vox_path(published, slug) do
@@ -39,7 +52,6 @@ defmodule Toscanini.Workers.PublishWorker do
         "#{year}/#{month}/W#{week}/#{slug}.md"
 
       {:error, _} ->
-        # Fallback sem data
         "unknown/#{slug}.md"
     end
   end
