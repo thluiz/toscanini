@@ -73,15 +73,22 @@ def acquire_gpu_lock():
     except (ValueError, FileNotFoundError):
         pass  # unreadable lock — treat as stale
     except ProcessLookupError:
-        print(f"Stale GPU lock (pid dead), taking over", file=sys.stderr)
+        print(f"Stale GPU lock (pid dead), clearing", file=sys.stderr)
 
-    # Stale lock — overwrite atomically
-    tmp = GPU_LOCK + ".tmp"
-    with open(tmp, "w") as f:
-        f.write(pid)
-    os.replace(tmp, GPU_LOCK)
-    print(f"GPU lock acquired after clearing stale (pid={pid})", file=sys.stderr)
-    return True
+    # Stale lock — remove and re-acquire atomically via O_EXCL
+    try:
+        os.unlink(GPU_LOCK)
+    except FileNotFoundError:
+        pass
+    try:
+        fd = os.open(GPU_LOCK, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        os.write(fd, pid.encode())
+        os.close(fd)
+        print(f"GPU lock acquired after clearing stale (pid={pid})", file=sys.stderr)
+        return True
+    except FileExistsError:
+        print(f"GPU lock lost race after clearing stale, using CPU", file=sys.stderr)
+        return False
 
 
 def release_gpu_lock():
