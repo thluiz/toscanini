@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.2.1] — 2026-04-06
+
+### Bug fix: scheduler usava UTC em vez de hora local
+
+- **`priv/whisper_worker.py`** — `datetime.utcnow()` já tinha sido corrigido para `datetime.now()` num hotfix anterior
+- **`transcribe_worker.ex`** — corrigido `Time.utc_now().hour` → `DateTime.now!("Europe/Lisbon").hour` em `get_current_cores/1` e `apply_queue_concurrency/1`. Bug pré-existente desde v0.2.0 que causava desfasamento de 1h (WEST = UTC+1), permitindo 2 jobs GPU simultâneos
+- **`priv/queue_schedules.json`** — template actualizado: cores 12→14 na janela 9h-20h (alinhado com runtime)
+- **`data/queue_schedules.json`** — removido do git (runtime, sobrescrito pela API). Adicionado ao `.gitignore`
+
 All notable changes to Toscanini are documented in this file.
 
 ## [0.2.0] — 2026-03-15
