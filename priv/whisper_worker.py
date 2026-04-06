@@ -49,6 +49,8 @@ def get_free_vram_mb():
 
 
 GPU_LOCK = "/tmp/whisper-gpu.lock"
+CPU_LOCK_PREFIX = "/tmp/whisper-cpu"
+MAX_CPU_SLOTS = 2
 
 
 def acquire_gpu_lock():
@@ -99,6 +101,60 @@ def release_gpu_lock():
         pass
 
 
+def acquire_cpu_slot(max_slots=MAX_CPU_SLOTS, timeout=120, interval=5):
+    """Try to acquire a CPU slot. Waits up to timeout seconds.
+    Returns slot number (0-based) or -1 if timeout."""
+    pid = str(os.getpid())
+    elapsed = 0
+    while True:
+        for i in range(max_slots):
+            lock = f"{CPU_LOCK_PREFIX}-{i}.lock"
+            try:
+                fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+                os.write(fd, pid.encode())
+                os.close(fd)
+                print(f"CPU slot {i} acquired (pid={pid})", file=sys.stderr)
+                return i
+            except FileExistsError:
+                # Check if stale
+                try:
+                    held_pid = int(open(lock).read().strip())
+                    os.kill(held_pid, 0)
+                    continue  # alive, try next slot
+                except (ProcessLookupError, ValueError, FileNotFoundError):
+                    # Stale — try to take over atomically
+                    try:
+                        os.unlink(lock)
+                    except FileNotFoundError:
+                        pass
+                    try:
+                        fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+                        os.write(fd, pid.encode())
+                        os.close(fd)
+                        print(f"CPU slot {i} acquired after clearing stale (pid={pid})", file=sys.stderr)
+                        return i
+                    except FileExistsError:
+                        continue
+        if elapsed >= timeout:
+            print(f"CPU slot timeout after {timeout}s, proceeding anyway", file=sys.stderr)
+            return -1
+        if elapsed == 0:
+            print(f"All {max_slots} CPU slots busy, waiting...", file=sys.stderr)
+        time.sleep(interval)
+        elapsed += interval
+
+
+def release_cpu_slot(slot):
+    if slot < 0:
+        return
+    lock = f"{CPU_LOCK_PREFIX}-{slot}.lock"
+    try:
+        os.unlink(lock)
+        print(f"CPU slot {slot} released", file=sys.stderr)
+    except FileNotFoundError:
+        pass
+
+
 def select_model():
     import json
     from datetime import datetime
@@ -114,8 +170,9 @@ def select_model():
         # No config file — safe default: CPU only
         print("No scheduler config found, defaulting to CPU", file=sys.stderr)
     if gpu_allowed and acquire_gpu_lock():
-        return "large-v3", "cuda", "float16", True
-    return "large-v3", "cpu", "int8", False
+        return "large-v3", "cuda", "float16", True, -1
+    cpu_slot = acquire_cpu_slot()
+    return "large-v3", "cpu", "int8", False, cpu_slot
 
 
 def wait_for_vram(target_mb=3500, timeout=45, interval=5):
@@ -253,7 +310,7 @@ def main():
     if duration:
         print(f"Audio duration: {fmt_time(duration)} ({duration:.0f}s)", file=sys.stderr)
 
-    model_id, device, compute_type, got_gpu = select_model()
+    model_id, device, compute_type, got_gpu, cpu_slot = select_model()
     model_name = f"{model_id}/{device}/{compute_type}"
     print(f"Selected model: {model_name}", file=sys.stderr)
 
@@ -311,6 +368,7 @@ def main():
     finally:
         if got_gpu:
             release_gpu_lock()
+        release_cpu_slot(cpu_slot)
 
 
 if __name__ == "__main__":
