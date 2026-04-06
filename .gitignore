@@ -30,3 +30,6 @@ hermes_orchestrator-*.tar
 data/*.db
 data/*.db-shm
 data/*.db-wal
+
+# Runtime schedule (overwritten by API)
+data/queue_schedules.json

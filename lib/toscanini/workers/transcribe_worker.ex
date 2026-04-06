@@ -85,7 +85,7 @@ defmodule Toscanini.Workers.TranscribeWorker do
 
   defp get_current_cores(queue) do
     path = Path.join(Application.get_env(:toscanini, :data_dir, "data"), "queue_schedules.json")
-    hour = Time.utc_now().hour
+    hour = DateTime.now!("Europe/Lisbon").hour
     with {:ok, raw} <- File.read(path),
          {:ok, schedules} <- Jason.decode(raw),
          windows when is_list(windows) <- schedules[Atom.to_string(queue)] do
@@ -100,7 +100,7 @@ defmodule Toscanini.Workers.TranscribeWorker do
 
   defp apply_queue_concurrency(queue) do
     path = Path.join(Application.get_env(:toscanini, :data_dir, "data"), "queue_schedules.json")
-    hour = Time.utc_now().hour
+    hour = DateTime.now!("Europe/Lisbon").hour
     with {:ok, raw} <- File.read(path),
          {:ok, schedules} <- Jason.decode(raw),
          windows when is_list(windows) <- schedules[Atom.to_string(queue)] do

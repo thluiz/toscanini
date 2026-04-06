@@ -8,10 +8,10 @@
       "to": 9
     },
     {
-      "cores": 22,
+      "cores": 14,
       "from": 9,
       "gpu": false,
-      "limit": 1,
+      "limit": 2,
       "to": 20
     },
     {
