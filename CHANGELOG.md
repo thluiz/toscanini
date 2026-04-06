@@ -4,10 +4,13 @@
 
 ### Bug fix: scheduler usava UTC em vez de hora local
 
-- **`priv/whisper_worker.py`** — `datetime.utcnow()` já tinha sido corrigido para `datetime.now()` num hotfix anterior
-- **`transcribe_worker.ex`** — corrigido `Time.utc_now().hour` → `DateTime.now!("Europe/Lisbon").hour` em `get_current_cores/1` e `apply_queue_concurrency/1`. Bug pré-existente desde v0.2.0 que causava desfasamento de 1h (WEST = UTC+1), permitindo 2 jobs GPU simultâneos
+- **`transcribe_worker.ex`** — corrigido `Time.utc_now().hour` → `NaiveDateTime.local_now().hour` em `get_current_cores/1` e `apply_queue_concurrency/1`. Bug pré-existente desde v0.2.0 que causava desfasamento de 1h (WEST = UTC+1), permitindo 2 jobs GPU simultâneos. (`DateTime.now!("Europe/Lisbon")` não funciona sem a lib `tzdata`)
 - **`priv/queue_schedules.json`** — template actualizado: cores 12→14 na janela 9h-20h (alinhado com runtime)
 - **`data/queue_schedules.json`** — removido do git (runtime, sobrescrito pela API). Adicionado ao `.gitignore`
+
+### Bug fix: race condition no GPU lock
+
+- **`priv/whisper_worker.py`** — quando múltiplos workers detectavam stale lock (PID morto) simultaneamente, todos faziam `os.replace` e achavam que tinham o lock → 2 jobs GPU ao mesmo tempo. Corrigido: `unlink` + `O_CREAT|O_EXCL` garante que só um worker ganha o lock
 
 All notable changes to Toscanini are documented in this file.
 
