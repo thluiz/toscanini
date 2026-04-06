@@ -21,7 +21,7 @@ defmodule Toscanini.VoxPocketcastJsonRenderer do
       |> maybe_add(doc.recommendations != [], render_recommendations(doc.recommendations, lang))
       |> maybe_add(doc.timeline != [], render_timeline(doc.timeline, lang))
       |> add(render_metadata(doc.metadata, doc.frontmatter, lang))
-      |> maybe_add(doc.transcript != "", render_transcript(doc.transcript, lang))
+      # |> maybe_add(doc.transcript != "", render_transcript(doc.transcript, lang))  # transcript removed from MD — too heavy
 
     header <> "\n\n---\n\n" <> Enum.join(sections, "\n\n---\n\n") <> "\n"
   end
