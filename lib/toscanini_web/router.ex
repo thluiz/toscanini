@@ -14,6 +14,7 @@ defmodule ToscaniniWeb.Router do
     post "/batch",            BatchController, :create
     get  "/batch/:id",        BatchController, :show
     post "/publish/podcast",  PublishController, :create
+    post "/ingest/local",   IngestLocalController, :create
     post "/queue/:name/scale", QueueController, :scale
     get  "/scheduler/configs/:queue",  SchedulerController, :show
     put  "/scheduler/configs/:queue",  SchedulerController, :update

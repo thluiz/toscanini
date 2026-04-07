@@ -52,4 +52,59 @@ defmodule Toscanini.Pipeline do
 
     updated
   end
+
+  @doc """
+  Procura pipeline com mesmo slug (em results.collect.slug) que esteja
+  done ou running, excluindo o pipeline actual.
+  """
+  def find_duplicate_by_slug(slug, exclude_pipeline_id) do
+    sql = """
+    SELECT id FROM pipelines
+    WHERE id != ?
+      AND status IN ('done', 'running')
+      AND json_valid(results)
+      AND json_extract(results, '$.collect.slug') = ?
+    ORDER BY inserted_at ASC
+    LIMIT 1
+    """
+
+    case Repo.query(sql, [exclude_pipeline_id, slug]) do
+      {:ok, %{rows: [[id]]}} -> id
+      _ -> nil
+    end
+  end
+
+  @doc """
+  Marca pipeline como duplicado — status done, current_step done,
+  com nota de duplicação nos results.
+  """
+  def mark_duplicate(pipeline, original_pipeline_id) do
+    results = get_results(pipeline)
+              |> Map.put("duplicate_of", original_pipeline_id)
+              |> Map.put("skipped_reason", "duplicate_slug")
+
+    pipeline
+    |> changeset(%{
+      status: "done",
+      current_step: "done",
+      results: Jason.encode!(results)
+    })
+    |> Repo.update!()
+
+    # Se pertence a um batch, avançar para o próximo episódio
+    params = get_params(pipeline)
+    case {params["batch_id"], params["batch_item_id"]} do
+      {nil, _} -> :ok
+      {batch_id, item_id} when not is_nil(item_id) ->
+        Toscanini.Workers.BatchAdvanceWorker.new(%{
+          "batch_id"      => batch_id,
+          "batch_item_id" => item_id,
+          "result"        => "done"
+        })
+        |> Oban.insert!()
+    end
+
+    :ok
+  end
+
 end

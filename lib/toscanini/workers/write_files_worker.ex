@@ -24,7 +24,7 @@ defmodule Toscanini.Workers.WriteFilesWorker do
     File.mkdir_p!(Path.dirname(dest_json))
     File.write!(dest_json, Jason.encode!(json_data, pretty: true))
 
-    md_content = VoxPocketcastJsonRenderer.render(json_data)
+    md_content = VoxPocketcastJsonRenderer.render(json_data, slug: slug)
     File.write!(dest_md, md_content)
 
     title = json_data["title"] || collect["title"] || slug

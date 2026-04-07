@@ -7,7 +7,7 @@ defmodule Toscanini.VoxPocketcastJsonRenderer do
   @doc """
   Renders a decoded JSON map into a markdown string.
   """
-  def render(json_map) when is_map(json_map) do
+  def render(json_map, _opts \\ []) when is_map(json_map) do
     doc = normalize(json_map)
     lang = doc.frontmatter["lang"] || "pt"
     title = doc.frontmatter["title"] || ""
@@ -20,11 +20,12 @@ defmodule Toscanini.VoxPocketcastJsonRenderer do
       |> maybe_add(doc.annotations != [], render_annotations(doc.annotations, lang))
       |> maybe_add(doc.recommendations != [], render_recommendations(doc.recommendations, lang))
       |> maybe_add(doc.timeline != [], render_timeline(doc.timeline, lang))
-      |> add(render_metadata(doc.metadata, doc.frontmatter, lang))
       # |> maybe_add(doc.transcript != "", render_transcript(doc.transcript, lang))  # transcript removed from MD — too heavy
 
-    header <> "\n\n---\n\n" <> Enum.join(sections, "\n\n---\n\n") <> "\n"
+    body = header <> "\n\n---\n\n" <> Enum.join(sections, "\n\n---\n\n")
+    body <> "\n"
   end
+
 
   # ---------------------------------------------------------------------------
   # Normalize: Toscanini flat format → internal render format
@@ -280,88 +281,6 @@ defmodule Toscanini.VoxPocketcastJsonRenderer do
   end
 
   # ---------------------------------------------------------------------------
-  # Metadata (Episode + Podcast info)
-  # ---------------------------------------------------------------------------
-
-  defp render_metadata(metadata, fm, lang) do
-    m = metadata
-
-    podcast      = m["podcast"]      || fm["podcast"]
-    author       = m["author"]
-    categories   = m["podcast_categories"]
-    published    = m["published"]
-    duration     = m["duration"]
-    source_url   = m["source_url"]
-    uuid         = m["uuid"]         || fm["uuid"]
-    podcast_name = m["podcast_name"] || m["podcast"]
-    podcast_type = m["podcast_type"]
-    podcast_site = m["podcast_site"]
-    podcast_uuid = m["podcast_uuid"]
-
-    has_podcast_info = podcast_name || podcast_type || podcast_site || podcast_uuid
-
-    if lang == "pt" do
-      lines = ["## Dados do Episódio", ""]
-      lines = if podcast,    do: lines ++ ["- **Podcast**: #{podcast}"],       else: lines
-      lines = if author,     do: lines ++ ["- **Autor**: #{author}"],          else: lines
-      lines = if categories, do: lines ++ ["- **Categoria**: #{categories}"],  else: lines
-      lines = if published,  do: lines ++ ["- **Publicado**: #{published}"],   else: lines
-      lines = if duration,   do: lines ++ ["- **Duração**: #{duration}"],      else: lines
-
-      lines =
-        if source_url do
-          lines ++ ["", "### Referências", "", "- **URL PocketCasts**: #{source_url}"]
-        else
-          lines
-        end
-
-      lines = if uuid, do: lines ++ ["- **UUID Episódio**: #{uuid}"], else: lines
-
-      lines =
-        if has_podcast_info do
-          base = lines ++ ["", "---", "", "## Dados do Podcast", ""]
-          base = if podcast_name, do: base ++ ["- **Nome**: #{podcast_name}"], else: base
-          base = if podcast_type, do: base ++ ["- **Tipo**: #{podcast_type}"], else: base
-          base = if podcast_site, do: base ++ ["- **Site**: #{podcast_site}"], else: base
-          if podcast_uuid,        do: base ++ ["- **UUID**: #{podcast_uuid}"], else: base
-        else
-          lines
-        end
-
-      Enum.join(lines, "\n")
-    else
-      lines = ["## Episode Info", ""]
-      lines = if podcast,    do: lines ++ ["- **Podcast**: #{podcast}"],      else: lines
-      lines = if author,     do: lines ++ ["- **Author**: #{author}"],        else: lines
-      lines = if categories, do: lines ++ ["- **Category**: #{categories}"],  else: lines
-      lines = if published,  do: lines ++ ["- **Published**: #{published}"],  else: lines
-      lines = if duration,   do: lines ++ ["- **Duration**: #{duration}"],    else: lines
-
-      lines =
-        if source_url do
-          lines ++ ["", "### References", "", "- **URL PocketCasts**: #{source_url}"]
-        else
-          lines
-        end
-
-      lines = if uuid, do: lines ++ ["- **Episode UUID**: #{uuid}"], else: lines
-
-      lines =
-        if has_podcast_info do
-          base = lines ++ ["", "---", "", "## Podcast Info", ""]
-          base = if podcast_name, do: base ++ ["- **Name**: #{podcast_name}"],  else: base
-          base = if podcast_type, do: base ++ ["- **Type**: #{podcast_type}"],  else: base
-          base = if podcast_site, do: base ++ ["- **Site**: #{podcast_site}"],  else: base
-          if podcast_uuid,        do: base ++ ["- **UUID**: #{podcast_uuid}"],  else: base
-        else
-          lines
-        end
-
-      Enum.join(lines, "\n")
-    end
-  end
-
-  # ---------------------------------------------------------------------------
   # Transcript
   # ---------------------------------------------------------------------------
 
@@ -379,7 +298,6 @@ defmodule Toscanini.VoxPocketcastJsonRenderer do
 
   defp maybe_add(sections, false, _block), do: sections
   defp maybe_add(sections, true, block), do: sections ++ [block]
-  defp add(sections, block), do: sections ++ [block]
 
   # Mimics Python's str.title(): capitalize first letter of each "word"
   # where a word starts after any non-letter character.

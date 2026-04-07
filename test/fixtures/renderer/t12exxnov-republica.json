@@ -1,0 +1,77 @@
+{
+  "aliases": [
+    "Proclamação da República"
+  ],
+  "annotations": [],
+  "description": "Reflexão sobre o significado da República no feriado de 15 de novembro e a defesa da ciência e tecnologia brasileiras frente aos cortes orçamentários.",
+  "lang": "pt",
+  "metadata": {
+    "author": "Fronteiras da Ciência/IF-UFRGS",
+    "podcast": "Fronteiras da Ciência",
+    "podcast_categories": "Science",
+    "podcast_site": "http://frontdaciencia.ufrgs.br",
+    "podcast_uuid": "fb4669d0-4a98-012e-1aa8-00163e1b201c",
+    "published": "2021-11-15T14:00:00Z",
+    "source": "pocketcasts",
+    "source_url": "https://pocketcasts.com/podcast/fronteiras-da-ci%C3%AAncia/fb4669d0-4a98-012e-1aa8-00163e1b201c/t12exxnov-rep%C3%BAblica/13286f3e-f6c5-4875-a87a-9cd8334b3b78",
+    "title": "T12ExxNov - República",
+    "uuid": "13286f3e-f6c5-4875-a87a-9cd8334b3b78"
+  },
+  "participants": [],
+  "recommendations": {
+    "leis": [
+      {
+        "description": "Mencionada como dispositivo que vem estrangulando setores essenciais como saúde, educação, cultura, ciência e tecnologia no Brasil.",
+        "title": "Emenda Constitucional 95 de 2017"
+      },
+      {
+        "description": "Aprovada em 15 de outubro de 2021, retirou 690 milhões de reais do orçamento da ciência e tecnologia brasileira, quase a totalidade da verba necessária para manter a pesquisa no país.",
+        "title": "Lei 14.220 de 2021"
+      }
+    ]
+  },
+  "summary": "Neste episódio especial do Fronteiras da Ciência, publicado no feriado de 15 de novembro, o programa faz uma pausa na programação regular para uma reflexão sobre o significado da República. A palavra, derivada do latim 'res publica' (coisa pública), refere-se ao sistema de governo onde o poder pertence ao povo, em oposição a monarquias, impérios e formas autoritárias de governo.\n\nO episódio destaca que a gestão dos bens comuns, que deveria ser o princípio republicano vigente, não está sendo observada no Brasil contemporâneo. Saúde, educação, cultura, ciência e tecnologia são apontados como serviços essenciais ao bem-estar e desenvolvimento do país, que devem ser financiados pelo Estado com o dinheiro do povo arrecadado por impostos.\n\nNo entanto, a coisa pública está sob ataque no Brasil, primeiro com a Emenda Constitucional 95 de 2017, que vem estrangulando esses setores, e agora com a aprovação da Lei 14.220 em outubro de 2021. Esta lei retirou 690 milhões de reais do orçamento da ciência e tecnologia brasileira, quase a totalidade da verba necessária para manter a pesquisa no país.\n\nO Fronteiras da Ciência reitera seu compromisso com o ideário republicano fundamental e se coloca na defesa do conhecimento produzido e utilizado por essas áreas fundamentais. O programa espera ver a urgente revogação tanto da Emenda Constitucional 95 quanto da Lei 14.220, reafirmando que o conhecimento é de todos e a todos deve servir.",
+  "tags": [
+    "republica",
+    "ciencia-brasileira",
+    "politica-cientifica",
+    "orçamento-ciencia",
+    "emenda-95",
+    "lei-14220",
+    "feriado-nacional",
+    "cortes-orçamentarios",
+    "educacao",
+    "saude",
+    "fronteiras-da-ciencia",
+    "science"
+  ],
+  "timeline": [
+    {
+      "summary": "O episódio começa contextualizando a data de 15 de novembro como feriado da Proclamação da República no Brasil. O programa anuncia que fará uma pausa na programação regular, mas não em silêncio, usando a oportunidade para refletir sobre o significado da palavra República. É explicado que República se refere ao sistema de governo onde o poder pertence ao povo, em oposição a monarquias e formas autoritárias.",
+      "time": "00:00:00",
+      "topic": "Introdução ao feriado da Proclamação da República"
+    },
+    {
+      "summary": "A palavra República é analisada etimologicamente, derivando do latim 'res publica', que significa 'coisa pública'. Esta acepção de gestão dos bens comuns é apresentada como o que deveria vigir em um sistema republicano. No entanto, o episódio observa que esta não é a realidade atual no Brasil, que é descrito como 'ajoelhado e posto à venda'.",
+      "time": "00:00:52",
+      "topic": "Origem etimológica e significado de República"
+    },
+    {
+      "summary": "Saúde, educação, cultura, ciência e tecnologia são identificados como os principais serviços essenciais ao bem-estar de todos e ao desenvolvimento do país. O episódio argumenta que, onde há dirigentes pensantes, estes serviços devem ser financiados pelo Estado, não como favor ou privilégio, mas como uso adequado do dinheiro do povo arrecadado por impostos.",
+      "time": "00:01:09",
+      "topic": "Serviços essenciais e financiamento público"
+    },
+    {
+      "summary": "A coisa pública está sob ataque no Brasil, primeiro com a Emenda Constitucional 95 de 2017, que vem estrangulando exatamente os setores essenciais mencionados anteriormente. Agora, com a aprovação da Lei 14.220 em 15 de outubro de 2021, a ciência e tecnologia brasileira perdeu 690 milhões de reais, quase a totalidade da verba necessária para manter a pesquisa no país.",
+      "time": "00:01:33",
+      "topic": "Ataques à coisa pública no Brasil contemporâneo"
+    },
+    {
+      "summary": "O Fronteiras da Ciência reitera seu compromisso com o ideário republicano fundamental e se coloca na defesa do conhecimento produzido e utilizado pelas áreas fundamentais para a vida de todos os brasileiros. O programa espera ver a urgente revogação tanto da Emenda Constitucional 95 quanto da Lei 14.220, reafirmando que o conhecimento é de todos e a todos deve servir.",
+      "time": "00:02:12",
+      "topic": "Compromisso com o ideário republicano e defesa do conhecimento"
+    }
+  ],
+  "title": "T12ExxNov - República",
+  "version": 1
+}
