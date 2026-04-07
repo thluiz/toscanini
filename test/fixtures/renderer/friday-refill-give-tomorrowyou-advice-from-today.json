@@ -1,0 +1,83 @@
+{
+  "aliases": [
+    "Friday Refill",
+    "Friday Rebuild",
+    "Friday Briefly"
+  ],
+  "description": "Jonathan Patrell discusses how daily habits overpower to-do lists and introduces a practical habit of journaling actionable advice for your future self to reduce cognitive load and improve focus.",
+  "lang": "en",
+  "metadata": {
+    "author": "Jonathan Cutrell",
+    "duration": "00:04:46",
+    "podcast": "Developer Tea",
+    "podcast_categories": "Technology\nBusiness\n  Careers\nSociety & Culture",
+    "podcast_site": "http://www.developertea.com",
+    "podcast_type": "episodic",
+    "podcast_uuid": "cbe9b6c0-7da4-0132-e6ef-5f4c86fd3263",
+    "published": "2021-08-06T11:00:00Z",
+    "source": "pocketcasts",
+    "source_url": "https://pocketcasts.com/podcast/developer-tea/cbe9b6c0-7da4-0132-e6ef-5f4c86fd3263/friday-refill-give-tomorrow-you-advice-from-today/2d699972-c079-4637-8c66-e91ff97e3e3c",
+    "title": "Friday Refill: Give Tomorrow-You Advice from Today",
+    "uuid": "2d699972-c079-4637-8c66-e91ff97e3e3c"
+  },
+  "participants": [
+    "Jonathan Patrell"
+  ],
+  "recommendations": {
+    "practices": [
+      {
+        "description": "The core recommendation of the episode: a habit of writing down practical, actionable advice for your tomorrow self (or next-week self) to review at the start of your work session.",
+        "title": "Journaling advice for your future self"
+      }
+    ]
+  },
+  "summary": "The episode opens by acknowledging a common experience: the day slips away without us realizing it, and we often have little to show for it in terms of accomplishments. The host, Jonathan Patrell, explains that this happens because our everyday routines and habits are far more powerful predictors of our behavior than any to-do list we might create. Habits operate automatically, making them a stronger force in shaping our daily actions.\n\nTo combat this, Patrell introduces a specific habit designed to bridge the gap between intention and action. He suggests setting aside time—ideally on Sunday nights or at the end of each day—to write down practical, actionable advice for your future self. This advice should not be vague or idealistic but should focus on concrete next steps, such as who to talk to, what perspective to adopt on a problem, or what specific task to tackle next.\n\nThe second part of the habit is to review this journaled advice at the beginning of your work session, especially when entering a deep work mode. This practice serves as a \"touchstone\" to quickly reload your mental state from the previous session, reducing the cognitive load of trying to remember where you left off. By framing notes as actionable advice rather than passive observations, you create a direct link to productive action.\n\nPatrell emphasizes that this method is essentially a shortcut for managing cognitive resources. Instead of wasting mental energy replaying the previous day's events or reconstructing your thought process, you have a ready-made guide to pick up where you left off. This simple habit leverages the power of routine to make intentional progress more consistent and less mentally taxing.",
+  "tags": [
+    "productivity",
+    "habits",
+    "journaling",
+    "advice",
+    "deep-work",
+    "cognitive-load",
+    "routine",
+    "focus",
+    "self-improvement",
+    "developer",
+    "jonathan-patrell",
+    "developer-tea",
+    "technology",
+    "business",
+    "careers",
+    "society",
+    "culture"
+  ],
+  "timeline": [
+    {
+      "summary": "Jonathan Patrell welcomes listeners to the Friday episode. He describes the common experience of finding oneself halfway through the day without realizing it, having accomplished little. He questions why this happens and sets the stage for discussing the power of habits over to-do lists.",
+      "time": "00:00:00",
+      "topic": "Introduction and the problem of days slipping away"
+    },
+    {
+      "summary": "Patrell states that our everyday routines are a much stronger predictor of behavior than items on a to-do list. He explains that habits are automatic, making them a dominant force. This leads to the proposal of creating a new, intentional habit to combat unproductive autopilot.",
+      "time": "00:01:06",
+      "topic": "Habits are more powerful than to-do lists"
+    },
+    {
+      "summary": "The host introduces the core habit: taking time weekly (e.g., Sunday night) or daily to write down practical advice for your tomorrow self. He recommends using a journal or notes app, emphasizing writing for better retention. The advice should be actionable, focusing on next steps, perspectives, or seeds for future tasks, not lofty ideals.",
+      "time": "00:01:49",
+      "topic": "Introducing the habit: journaling advice for your future self"
+    },
+    {
+      "summary": "Patrell explains the second component of the habit: opening and reading this journaled advice when you begin your work mode, especially before deep work. The goal is to have one specific thing to focus on, creating a ritual that reduces the cognitive load of trying to remember or reload your previous mental state.",
+      "time": "00:02:57",
+      "topic": "The second part: reviewing advice at the start of work"
+    },
+    {
+      "summary": "The host clarifies that this practice is a shortcut to avoid the mental effort of replaying the previous day's events. The journal serves as a touchstone to remind you of your previous state. Framing it as actionable advice, rather than passive notes, is the critical factor that drives productive action.",
+      "time": "00:03:26",
+      "topic": "How this habit reduces cognitive load"
+    }
+  ],
+  "title": "Friday Refill: Give Tomorrow-You Advice from Today",
+  "version": 1
+}

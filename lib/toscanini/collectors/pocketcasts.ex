@@ -29,14 +29,7 @@ defmodule Toscanini.Collectors.Pocketcasts do
         {:ok, p, e} when p != e ->
           {url, p, e}
         _ ->
-          case resolve_url(url) do
-            {:ok, final} ->
-              case extract_uuids(final) do
-                {:ok, p, e} when p != e -> {final, p, e}
-                _           -> fetch_og_url(final)
-              end
-            _ -> {url, nil, nil}
-          end
+          resolve_or_search(url)
       end
 
     if is_nil(podcast_uuid) do
@@ -176,7 +169,7 @@ defmodule Toscanini.Collectors.Pocketcasts do
     path = Path.join(outdir, "#{slug}.mp3")
     File.mkdir_p!(outdir)
 
-    case Req.get(audio_url, into: File.stream!(path), max_redirects: 5) do
+    case Req.get(audio_url, into: File.stream!(path), max_redirects: 10) do
       {:ok, %{status: 200}} -> {:ok, path}
       {:ok, %{status: s}}   -> {:error, "download HTTP #{s}"}
       {:error, e}           -> {:error, inspect(e)}
@@ -269,6 +262,87 @@ defmodule Toscanini.Collectors.Pocketcasts do
           _ -> {url, nil, nil}
         end
       _ -> {url, nil, nil}
+    end
+  end
+
+  # Tenta resolver a URL via redirects/og:url. Se falhar e houver um UUID único,
+  # procura o episódio nos podcasts já conhecidos (ficheiros colectados).
+  defp resolve_or_search(url) do
+    # Primeiro: tentar redirect + og:url (caminho original)
+    resolved =
+      case resolve_url(url) do
+        {:ok, final} ->
+          case extract_uuids(final) do
+            {:ok, p, e} when p != e -> {final, p, e}
+            _ -> fetch_og_url(final)
+          end
+        _ -> {url, nil, nil}
+      end
+
+    case resolved do
+      {_, p, _} when not is_nil(p) ->
+        resolved
+
+      _ ->
+        # Fallback: UUID único → tentar como episode_uuid nos podcasts conhecidos
+        case extract_uuids(url) do
+          {:ok, ep_uuid, ep_uuid} ->
+            case search_known_podcasts(ep_uuid) do
+              {:ok, podcast_uuid} -> {url, podcast_uuid, ep_uuid}
+              _ -> {url, nil, nil}
+            end
+          _ -> {url, nil, nil}
+        end
+    end
+  end
+
+  # Procura um episódio pelo UUID em todos os podcasts já colectados.
+  # Lê podcast_uuids dos JSONs locais, depois tenta cada um na API.
+  defp search_known_podcasts(episode_uuid) do
+    require Logger
+    collected_dir = Application.get_env(:toscanini, :collected_dir)
+
+    podcast_uuids =
+      Path.wildcard(Path.join(collected_dir, "*.json"))
+      |> Enum.reduce(MapSet.new(), fn path, acc ->
+        case File.read(path) do
+          {:ok, raw} ->
+            case Jason.decode(raw) do
+              {:ok, %{"metadata" => %{"podcast_uuid" => puuid}}} when is_binary(puuid) ->
+                MapSet.put(acc, puuid)
+              _ -> acc
+            end
+          _ -> acc
+        end
+      end)
+      |> MapSet.to_list()
+
+    Logger.info("[Pocketcasts] searching #{length(podcast_uuids)} known podcasts for episode #{episode_uuid}")
+
+    # Tenta cada podcast em paralelo (max 10 concorrentes)
+    podcast_uuids
+    |> Task.async_stream(
+      fn puuid ->
+        case fetch_episode(puuid, episode_uuid) do
+          {:ok, _, _} -> {:found, puuid}
+          _ -> :not_found
+        end
+      end,
+      max_concurrency: 10,
+      timeout: 15_000,
+      on_timeout: :kill_task
+    )
+    |> Enum.find_value(fn
+      {:ok, {:found, puuid}} -> {:ok, puuid}
+      _ -> nil
+    end)
+    |> case do
+      {:ok, puuid} ->
+        Logger.info("[Pocketcasts] found episode #{episode_uuid} in podcast #{puuid}")
+        {:ok, puuid}
+      nil ->
+        Logger.warning("[Pocketcasts] episode #{episode_uuid} not found in any known podcast")
+        {:error, "episode not found in known podcasts"}
     end
   end
 

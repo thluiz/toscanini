@@ -12,7 +12,22 @@ defmodule Toscanini.Workers.CollectWorker do
     case collector.collect(params["url"]) do
       {:ok, result} ->
         Pipeline.save_result(pipeline, "collect", result)
-        Dispatcher.advance(pid)
+
+        slug  = result["slug"]
+        force = params["force_retranscribe"] == true
+
+        if not force and slug != nil and slug != "" do
+          case Pipeline.find_duplicate_by_slug(slug, pid) do
+            nil ->
+              Dispatcher.advance(pid)
+
+            existing_id ->
+              Pipeline.mark_duplicate(pipeline, existing_id)
+          end
+        else
+          Dispatcher.advance(pid)
+        end
+
         :ok
 
       {:error, reason} ->
