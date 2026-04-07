@@ -1,5 +1,135 @@
 # Changelog
 
+## [0.2.2] — 2026-04-07
+
+### Pipeline deduplication by slug
+
+- **`lib/toscanini/pipeline.ex`** — new `find_duplicate_by_slug/2` and
+  `mark_duplicate/2`. `find_duplicate_by_slug/2` runs a SQL query over
+  the `pipelines` table (`json_extract(results, '$.collect.slug')`) to
+  find any pipeline with the same slug that is `running` or `done`,
+  excluding the current one. `mark_duplicate/2` marks the current
+  pipeline as `done` with `results.duplicate_of` + `results.skipped_reason
+  = "duplicate_slug"`, and — if the pipeline is part of a batch —
+  enqueues a `BatchAdvanceWorker` to move the batch forward.
+- **`lib/toscanini/workers/collect_worker.ex`** — after a successful
+  collect step, looks up the slug in existing pipelines. If a duplicate
+  exists and `params["force_retranscribe"]` is not `true`, marks the
+  current pipeline as duplicate and skips downstream work. Otherwise
+  advances normally.
+
+**Why:** avoids re-transcribing and re-publishing episodes that were
+already processed under a different URL (e.g., the same episode
+submitted via different PocketCasts share links). Saves GPU time and
+prevents duplicate outputs in `vox-content`.
+
+### Pocketcasts collector — resilience improvements
+
+- **`lib/toscanini/collectors/pocketcasts.ex`**
+  - New `resolve_or_search/1` wraps the original redirect + og:url
+    resolution path. When that fails but the input URL contains a
+    single UUID (ambiguous between podcast and episode), falls back to
+    `search_known_podcasts/1` which reads all JSONs under
+    `collected_dir`, collects every distinct `metadata.podcast_uuid`,
+    and tries the episode UUID against each one in parallel (`Task.async_stream`,
+    `max_concurrency: 10`, `timeout: 15_000`, `on_timeout: :kill_task`).
+    First match wins and is logged.
+  - `download_audio/2` — `max_redirects` bumped from **5 → 10**. Some
+    CDN chains exceeded 5 hops and were failing mid-download.
+
+**Why:** PocketCasts share URLs occasionally redirect to pages that
+don't expose the podcast UUID in their `og:url`, leaving only an
+episode UUID. Before, collection would fail; now Toscanini can locate
+the parent podcast by probing podcasts it already knows.
+
+### New endpoint: `POST /ingest/local`
+
+- **`lib/toscanini_web/controllers/ingest_local_controller.ex`** (new)
+  — accepts `{slug, json, duration_secs, source_url?}` and ingests an
+  episode whose audio (`<slug>.mp3`) is already present in
+  `collected_dir`. Writes the provided JSON beside the MP3, creates a
+  fresh pipeline row with `collector: "local_ingest"` and
+  `current_step: "collect"`, and kicks it into the dispatcher. Returns
+  `202 Accepted` with the job id. Responds `422` if the MP3 is missing
+  and `400` on missing required fields.
+- **`lib/toscanini_web/router.ex`** — route `POST /ingest/local` →
+  `IngestLocalController.create/2` added to the API scope.
+- **`lib/toscanini/workers/write_files_worker.ex`** — now passes
+  `slug: slug` to `VoxPocketcastJsonRenderer.render/2`. (With the
+  renderer change below this option is no longer consumed, but the
+  call site remains forward-compatible.)
+
+**Why:** enables bypassing the PocketCasts collector entirely when an
+episode has been downloaded or transcribed via an external tool —
+useful for manual rescues of episodes that PocketCasts doesn't resolve.
+
+### VoxPocketcastJsonRenderer: metadata sections moved to Hugo footer
+
+The episode metadata previously emitted inline in the generated markdown
+(`## Dados do Episódio` / `## Dados do Podcast` / `## Episode Info` /
+`## Podcast Info`) is now rendered by the Vox-Hugo `episode-footer`
+partial, which reads the sibling `.json` sidecar at build time. This
+eliminates content/template duplication and centralises all
+podcast/episode metadata display in the theme.
+
+- **`lib/toscanini/vox_pocketcast_json_renderer.ex`**
+  - Removed `render_metadata/3` and its section header — no longer
+    emits `## Dados do Episódio` / `## Dados do Podcast` /
+    `## Episode Info` / `## Podcast Info` blocks or the nested
+    `### Referências` / `### References` metadata subsection containing
+    the PocketCasts URL.
+  - Removed `render_json_footer/2` — no longer appends the hardcoded
+    `[Dados adicionais e transcrição](slug.json)` /
+    `[Additional data and transcript](slug.json)` link at the bottom of
+    every episode. The Hugo footer reconstructs this link from the page
+    permalink.
+  - Removed the now-unused `add/2` helper.
+  - `render/2` signature: `opts` → `_opts` (the `:slug` option is no
+    longer consumed, but the call in `WriteFilesWorker` still passes
+    it for forward compatibility).
+
+**Why:** the old approach meant (a) every published episode carried the
+same metadata block in content form, (b) editing the presentation
+required bulk-rewriting thousands of markdown files, and (c) path
+fragility in the JSON pointer link forced a workaround in Hugo's
+`render-link.html`. Moving metadata to the Hugo template makes it
+editorial-free, keeps content focused on the episode itself, and allows
+a single place to update presentation across the entire archive.
+
+**Note:** new episodes will be emitted clean from this commit onward.
+Existing episodes in `E:\vox-content` still contain the old sections —
+a follow-up cleanup pass removes them from the ~1841 historical MDs.
+
+### Test infrastructure: renderer unit tests
+
+- **`test/toscanini/vox_pocketcast_json_renderer_test.exs`** (new) —
+  20 ExUnit tests covering `VoxPocketcastJsonRenderer.render/2`. Two
+  fixture-driven `describe` blocks (one PT, one EN) verify the overall
+  output shape (frontmatter → H1 → editorial sections), the presence of
+  expected sections (`## Resumo`/`## Summary`, `## Linha do Tempo`/
+  `## Topic Timeline`, `## Indicações`/`## Recommendations`), and the
+  *absence* of all four metadata blocks plus the legacy hardcoded JSON
+  pointer link. A third `describe` covers minimal-input edge cases and
+  the forward-compatible `:slug` option. Tests run `async: true` since
+  the renderer is pure.
+- **`test/fixtures/renderer/t12exxnov-republica.json`** (new) — small
+  PT episode fixture (~6 KB) captured from
+  `E:\vox-content\2021\11\W46`, transcript field stripped to keep the
+  fixture lightweight. Real `recommendations` (with `leis` category)
+  and timeline data exercise the full rendering pipeline.
+- **`test/fixtures/renderer/friday-refill-give-tomorrowyou-advice-from-today.json`**
+  (new) — small EN episode fixture (~6 KB) captured from
+  `E:\vox-content\2021\08\W31`, transcript stripped. Includes a single
+  participant and a `practices` recommendations category.
+- **`config/test.exs`** — added `pool: Ecto.Adapters.SQL.Sandbox` to
+  the `Toscanini.Repo` config. The previous test config left the pool
+  unset, which made `test_helper.exs`'s `Sandbox.mode/2` call blow up
+  with `cannot invoke sandbox operation with pool DBConnection.ConnectionPool`
+  on any `mix test` invocation. With this fix the entire test suite
+  (including the new renderer tests and the pre-existing
+  `error_json_test.exs`) is runnable.
+
+
 ## [0.2.1] — 2026-04-06
 
 ### Bug fix: scheduler usava UTC em vez de hora local
