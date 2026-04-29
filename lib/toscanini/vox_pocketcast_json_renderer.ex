@@ -164,7 +164,8 @@ defmodule Toscanini.VoxPocketcastJsonRenderer do
   defp needs_quoting?(str) do
     String.contains?(str, ": ") or
     String.contains?(str, " #") or
-      Regex.match?(~r/^[#\{\[\>\|\!&\*\?\-,]/, str) or
+    String.contains?(str, "\"") or
+      Regex.match?(~r/^[#\{\[\>\|\!&\*\?\-,'"]/, str) or
       str in ["true", "false", "null", "yes", "no", "on", "off"]
   end
 
