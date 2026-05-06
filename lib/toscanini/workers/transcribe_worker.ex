@@ -22,7 +22,8 @@ defmodule Toscanini.Workers.TranscribeWorker do
       Dispatcher.advance(pid)
       :ok
     else
-      run_transcription(pipeline, collect["mp3"], json_path, json_data)
+      audio_path = collect["audio"] || collect["mp3"]
+      run_transcription(pipeline, audio_path, json_path, json_data)
     end
   end
 
