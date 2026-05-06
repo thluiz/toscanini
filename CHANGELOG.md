@@ -1,5 +1,57 @@
 # Changelog
 
+## [0.2.3] — 2026-05-06
+
+### YouTube collector
+
+- **`lib/toscanini/collectors/youtube.ex`** (new) — collector que aceita
+  uma URL de vídeo do YouTube e produz o mesmo par `<slug>.mp3` /
+  `<slug>.json` no `collected_dir` que o collector Pocketcasts. Fluxo:
+  - **`fetch_metadata/1`** chama `yt-dlp --skip-download --print '%(.{...})j'`
+    para extrair só metadata (id, title, channel, channel_id, channel_url,
+    uploader, timestamp, upload_date, duration, description, categories,
+    tags, webpage_url, thumbnail, language). Pega a última linha do output
+    que parse-a como JSON, ignorando warnings que yt-dlp emite em stderr.
+  - **`build_meta/2`** normaliza title (strip `\r\n`), gera slug
+    (downcase + NFD + strip de tudo que não é `[a-z0-9 ]`, espaços →
+    hífen, máx 80 chars), constrói `published` ISO8601 a partir de
+    `timestamp` (unix) ou `upload_date` (YYYYMMDD), e mapeia channel/
+    uploader para `podcast`/`author` para casar com o schema existente.
+    `podcast_show_type` fixo em `"video"`.
+  - **`download_audio/3`** chama `yt-dlp -f bestaudio --print
+    after_move:filepath` com template `<slug>.%(ext)s`. Extensão real
+    fica a cargo do yt-dlp (geralmente webm/Opus). Antes de baixar,
+    `find_cached_audio/2` procura por `<slug>.{webm,m4a,opus,mp4,mp3,
+    ogg,wav}` e reusa se existir — re-runs não rebaixam.
+  - **`write_json/2`** faz merge com JSON existente: preserva
+    `description`/`lang` se já presentes (output de summarize não é
+    sobrescrito em re-runs), mas atualiza `metadata` com fresh values
+    não-nil. Marca `metadata.source = "youtube"`.
+
+- **`lib/toscanini/pipelines.ex`** — registro de `"youtube" =>
+  Toscanini.Collectors.Youtube` no map `@collectors`. Pipelines agora
+  podem ser criados com `collector: "youtube"`.
+
+- **`lib/toscanini/workers/transcribe_worker.ex`** — `run_transcription/4`
+  agora lê `collect["audio"] || collect["mp3"]`. O collector YouTube
+  emite a chave `audio` (extensão variável); Pocketcasts continua
+  usando `mp3`. Backwards-compatible.
+
+### Configuração
+
+- **`TOSCANINI_YTDLP_BIN`** (env, default `/home/hermes/.local/bin/yt-dlp`)
+  — caminho do binário yt-dlp. yt-dlp tem que estar instalado no host
+  e ter ffmpeg disponível no `$PATH` para extração de áudio.
+
+### Tests
+
+- **`test/toscanini/collectors/youtube_test.exs`** (new) — cobertura
+  de `build_meta/2` (normalização de título, slugify com unicode,
+  parsing de `timestamp` vs `upload_date`, fallback de campos) e
+  `write_json/2` (merge preservando description/lang existentes,
+  `source = "youtube"`).
+
+
 ## [0.2.2] — 2026-04-07
 
 ### Pipeline deduplication by slug
