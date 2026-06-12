@@ -174,6 +174,9 @@ cd ~/services/toscanini
 ./start.sh    # sources asdf, runs mix phx.server
 ```
 
+The systemd unit lives at `deploy/toscanini.service` — see
+[`deploy/README.md`](deploy/README.md) for install/upgrade.
+
 ## Database
 
 SQLite at `data/orchestrator.db`. Key tables:
