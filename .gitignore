@@ -33,3 +33,6 @@ data/*.db-wal
 
 # Runtime schedule (overwritten by API)
 data/queue_schedules.json
+
+# Claude Code local settings
+.claude/

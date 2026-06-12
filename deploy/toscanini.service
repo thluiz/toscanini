@@ -1,0 +1,38 @@
+[Unit]
+Description=toscanini
+After=network.target
+
+[Service]
+Type=simple
+User=hermes
+WorkingDirectory=/home/hermes/services/toscanini
+ExecStart=/bin/bash /home/hermes/services/toscanini/start.sh
+Restart=on-failure
+RestartSec=5
+
+# Identidade e paths
+Environment=HOME=/home/hermes
+# PATH inclui /home/hermes/.deno/bin para yt-dlp encontrar o JS runtime
+# (necessário a partir de yt-dlp 2026.06+ para extração de YouTube)
+Environment=PATH=/home/hermes/.deno/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=MIX_ENV=dev
+
+# Topologia de rede — editar aqui para mudar sem tocar em código Elixir
+Environment=HERMES_BASE_URL=http://localhost:8080
+
+# Paths de dados — editar aqui para mover sem tocar em código Elixir
+# TOSCANINI_DB_PATH: relativo ao WorkingDirectory por padrão (data/orchestrator.db)
+# Environment=TOSCANINI_DB_PATH=/home/hermes/services/toscanini/data/orchestrator.db
+Environment=TOSCANINI_COLLECTED_DIR=/home/hermes/collected
+Environment=TOSCANINI_VOX_CONTENT_DIR=/home/hermes/vox-content
+Environment=TOSCANINI_VOX_PUBLISH_BIN=/home/hermes/.local/bin/vox-publish
+Environment=GOSSIPGATE_API_KEY=<REDACTED:GOSSIPGATE_API_KEY>
+Environment=VOX_BASE_URL=https://vox.thluiz.com
+Environment=FACEBOOK_APP_TOKEN=<REDACTED:FACEBOOK_APP_TOKEN>
+Environment=FACEBOOK_REFRESH_DELAY=120
+Environment=WHISPER_PYTHON_PATH=/home/hermes/whisper-venv/bin/python3
+Environment=WHISPER_WORKER_PATH=/home/hermes/services/toscanini/priv/whisper_worker.py
+Environment=WHISPER_LD_LIBRARY_PATH=/home/hermes/whisper-venv/lib/python3.10/site-packages/nvidia/cublas/lib:/home/hermes/whisper-venv/lib/python3.10/site-packages/nvidia/cudnn/lib:/usr/lib/wsl/lib
+
+[Install]
+WantedBy=multi-user.target
