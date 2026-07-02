@@ -1,5 +1,42 @@
 # Changelog
 
+## [0.2.4] — 2026-06-30
+
+### Resiliência do collector Pocketcasts a falhas transitórias "não encontrado no feed"
+
+A API PocketCasts (`/podcast/full/{uuid}`) por vezes devolve a lista de
+episódios truncada/em cache, fazendo `fetch_episode` não encontrar o
+episódio e o pipeline falhar no passo `collect` com "episódio X não
+encontrado no feed". O erro é transitório — resubmeter minutos/horas
+depois quase sempre funciona. Esta versão recupera automaticamente.
+
+- **`lib/toscanini/collectors/pocketcasts.ex`** — retry em dois níveis
+  para o caso "não encontrado no feed":
+  - `fetch_episode/2` passa a ser single-shot e devolve
+    `{:error, :not_in_feed}` quando o episódio não está na lista. Continua
+    a ser usado pela busca especulativa `search_known_podcasts` (rápida,
+    sem retry, para não atrasar as sondagens em paralelo).
+  - Novo `fetch_episode_with_retry/3` (usado só no caminho principal,
+    `fetch_metadata`) faz 2 re-tentativas curtas inline (2s, 4s ≈ máx 6s)
+    para absorver blips de segundos. Persistindo, devolve
+    `{:error, {:transient_feed, msg}}` (etiquetado) em vez do erro genérico.
+
+- **`lib/toscanini/workers/collect_worker.ex`** — backoff longo sem
+  bloquear a fila:
+  - Ao receber `{:error, {:transient_feed, msg}}`, em vez de falhar,
+    reagenda um novo job `CollectWorker` via `schedule_in` (30min, depois
+    1h — `@feed_retry_delays`), contando as tentativas longas no arg
+    `feed_retry`. O job atual retorna `:ok` e liberta o slot da fila
+    `:collectors` imediatamente — as outras coletas continuam normalmente
+    durante a espera (NÃO usa `Process.sleep`, que seguraria o slot).
+  - O pipeline fica em status `retrying` durante a janela de backoff (não
+    aparece como `failed`) e não dispara notificação de falha no Telegram.
+  - Esgotadas as 2 janelas (30min + 1h), falha de vez e notifica.
+
+Efeito: falhas transitórias "não encontrado no feed" recuperam sozinhas e
+deixam de exigir resubmissão manual. Links genuinamente mortos (404 na
+pca.st) continuam a falhar — só que após ~1h30 em vez de imediatamente.
+
 ## [0.2.3] — 2026-05-06
 
 ### YouTube collector
