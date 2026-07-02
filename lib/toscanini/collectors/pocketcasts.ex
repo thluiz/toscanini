@@ -1,6 +1,15 @@
 defmodule Toscanini.Collectors.Pocketcasts do
   @api_base "https://podcast-api.pocketcasts.com"
 
+  # Re-tentativas curtas (inline) quando o episódio não aparece no feed.
+  # Apanha blips de segundos sem segurar o slot da fila por muito tempo
+  # (máx ~6s: 2s + 4s). Backoffs longos (30min/1h) são feitos no CollectWorker
+  # via reagendamento Oban, para não bloquear a fila. Só se aplica ao caminho
+  # principal (fetch_episode_with_retry), NÃO à busca especulativa em podcasts
+  # conhecidos (search_known_podcasts usa fetch_episode single-shot).
+  @inline_feed_attempts 3
+  @inline_feed_backoff_ms 2000
+
   def collect(url, outdir \\ nil) do
     outdir = outdir || Application.get_env(:toscanini, :collected_dir)
 
@@ -35,7 +44,7 @@ defmodule Toscanini.Collectors.Pocketcasts do
     if is_nil(podcast_uuid) do
       {:error, "nenhum UUID na URL: #{resolved_url}"}
     else
-      with {:ok, ep, podcast_info} <- fetch_episode(podcast_uuid, episode_uuid) do
+      with {:ok, ep, podcast_info} <- fetch_episode_with_retry(podcast_uuid, episode_uuid) do
         build_meta(ep, resolved_url, podcast_uuid, podcast_info)
       end
     end
@@ -88,7 +97,27 @@ defmodule Toscanini.Collectors.Pocketcasts do
     end
   end
 
-  # 2. Chamar API PocketCasts → CDN (redirect automático) → JSON com episódios
+  # Caminho principal: busca o episódio com re-tentativas curtas inline para
+  # absorver respostas truncadas/em cache da API PocketCasts. Persistindo,
+  # devolve {:error, {:transient_feed, msg}} para o CollectWorker reagendar.
+  defp fetch_episode_with_retry(podcast_uuid, episode_uuid, attempt \\ 1) do
+    case fetch_episode(podcast_uuid, episode_uuid) do
+      {:error, :not_in_feed} ->
+        if attempt < @inline_feed_attempts do
+          Process.sleep(@inline_feed_backoff_ms * attempt)
+          fetch_episode_with_retry(podcast_uuid, episode_uuid, attempt + 1)
+        else
+          {:error, {:transient_feed, "episódio #{episode_uuid} não encontrado no feed"}}
+        end
+
+      other ->
+        other
+    end
+  end
+
+  # 2. Chamar API PocketCasts → CDN (redirect automático) → JSON com episódios.
+  # Single-shot, sem retry — usado tanto pelo caminho principal (via wrapper)
+  # como pela busca especulativa em podcasts conhecidos.
   # Req descomprime gzip e faz JSON decode automaticamente.
   defp fetch_episode(podcast_uuid, episode_uuid) do
     opts = [headers: [{"user-agent", "Mozilla/5.0"}]]
@@ -107,7 +136,7 @@ defmodule Toscanini.Collectors.Pocketcasts do
         episodes = podcast["episodes"] || []
 
         case Enum.find(episodes, &(&1["uuid"] == episode_uuid)) do
-          nil -> {:error, "episódio #{episode_uuid} não encontrado no feed"}
+          nil -> {:error, :not_in_feed}
           ep  -> {:ok, ep, podcast_info}
         end
 
@@ -319,7 +348,7 @@ defmodule Toscanini.Collectors.Pocketcasts do
 
     Logger.info("[Pocketcasts] searching #{length(podcast_uuids)} known podcasts for episode #{episode_uuid}")
 
-    # Tenta cada podcast em paralelo (max 10 concorrentes)
+    # Tenta cada podcast em paralelo (max 10 concorrentes) — single-shot, sem retry.
     podcast_uuids
     |> Task.async_stream(
       fn puuid ->
