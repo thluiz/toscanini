@@ -198,7 +198,18 @@ defmodule Toscanini.Collectors.Pocketcasts do
     path = Path.join(outdir, "#{slug}.mp3")
     File.mkdir_p!(outdir)
 
-    case Req.get(audio_url, into: File.stream!(path), max_redirects: 10) do
+    # verify: :verify_none SÓ no download do áudio. O Erlang/OTP 27 (:ssl) rejeita
+    # certos certs de CDNs (ex.: anchor.fm) que o OpenSSL aceita, com
+    # {:tls_alert, {:unsupported_certificate, key_usage_mismatch}}. O conteúdo é
+    # áudio público e não enviamos credenciais, então o risco é baixo. As chamadas
+    # de API (resolve_url/fetch_episode) mantêm verificação de certificado total.
+    opts = [
+      into: File.stream!(path),
+      max_redirects: 10,
+      connect_options: [transport_opts: [verify: :verify_none]]
+    ]
+
+    case Req.get(audio_url, opts) do
       {:ok, %{status: 200}} -> {:ok, path}
       {:ok, %{status: s}}   -> {:error, "download HTTP #{s}"}
       {:error, e}           -> {:error, inspect(e)}
