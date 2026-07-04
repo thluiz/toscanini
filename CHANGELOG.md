@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.2.5] — 2026-07-02
+
+### Download de áudio: `verify_none` para contornar TLS strict do OTP 27
+
+O Erlang/OTP 27 (`:ssl`) rejeita certos certificados de CDNs de áudio
+(ex.: anchor.fm) com `{:tls_alert, {:unsupported_certificate, ...}}` /
+`key_usage_mismatch` — certificados que o OpenSSL (curl/Python) aceita
+sem problema. Isto fazia o passo `collect` falhar no download do mp3.
+
+- **`lib/toscanini/collectors/pocketcasts.ex`** — `download_audio/3` passa
+  `connect_options: [transport_opts: [verify: :verify_none]]` ao `Req.get`.
+  A verificação de certificado é desativada APENAS no download do áudio
+  (conteúdo público, sem credenciais enviadas). As chamadas de API
+  (`resolve_url`, `fetch_episode`) mantêm verificação de certificado total.
+
 ## [0.2.4] — 2026-06-30
 
 ### Resiliência do collector Pocketcasts a falhas transitórias "não encontrado no feed"
