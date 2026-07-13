@@ -24,31 +24,62 @@ defmodule Toscanini.Workers.NotifyWorker do
     slug       = synth["slug"]
     title      = synth["title"] || slug
     verdict    = synth["verdict"]
+    draft      = synth["draft"] == true
+    findings   = synth["findings"] || []
     lexical    = synth["lexical_warnings"] || []
     authorship = synth["authorship"] || %{}
 
     base = Application.get_env(:toscanini, :scholion_base_url, "https://scholion.thluiz.com")
     url  = "#{String.trim_trailing(base, "/")}/notes/#{slug}/"
 
-    flag = if verdict == "yellow", do: "\n⚠️ ghost-audit: yellow (revisar)", else: ""
-
-    auth_flag =
-      if authorship["verified"] == false,
-        do: "\n🔎 autoria não verificada — conferir: #{escape(to_string(authorship["notes"]))}",
-        else: ""
-
-    lex = if lexical == [], do: "", else: "\n📝 lexical: #{escape(Enum.join(lexical, "; "))}"
-
     msg =
-      "✅ <b>#{escape(title)}</b>\n" <>
-        "<i>Scholion — citação</i>#{flag}#{auth_flag}#{lex}\n" <>
-        "🔗 <a href=\"#{url}\">#{escape(url)}</a>"
+      if draft do
+        # ghost-audit red → commitada como draft (fora do ar até corrigir).
+        "🛑 <b>Scholion — barrada (ghost-audit red) → salva como DRAFT</b>\n" <>
+          "<i>#{escape(title)}</i>\n" <>
+          "slug: <code>#{escape(slug)}</code>\n" <>
+          "Não vai ao ar até corrigir e remover <code>draft: true</code>.\n" <>
+          format_findings(findings) <>
+          "\n🔎 job: <code>#{escape(pipeline.id)}</code>"
+      else
+        flag = if verdict == "yellow", do: "\n⚠️ ghost-audit: yellow (revisar)", else: ""
+
+        auth_flag =
+          if authorship["verified"] == false,
+            do: "\n🔎 autoria não verificada — conferir: #{escape(to_string(authorship["notes"]))}",
+            else: ""
+
+        lex = if lexical == [], do: "", else: "\n📝 lexical: #{escape(Enum.join(lexical, "; "))}"
+
+        "✅ <b>#{escape(title)}</b>\n" <>
+          "<i>Scholion — citação</i>#{flag}#{auth_flag}#{lex}\n" <>
+          "🔗 <a href=\"#{url}\">#{escape(url)}</a>"
+      end
 
     GossipGate.send(msg)
     Pipeline.save_result(pipeline, "notify", %{"done" => true})
     Dispatcher.advance(pid)
     :ok
   end
+
+  defp format_findings([]), do: ""
+
+  defp format_findings(findings) when is_list(findings) do
+    items =
+      findings
+      |> Enum.take(8)
+      |> Enum.map(fn f ->
+        type = f["type"] || f["rule"] || f["severity"] || f["kind"] || ""
+        msg = f["message"] || f["msg"] || f["suggestion"] || f["detail"] || inspect(f)
+        prefix = if type == "", do: "", else: "#{escape(to_string(type))}: "
+        "• #{prefix}#{escape(to_string(msg))}"
+      end)
+      |> Enum.join("\n")
+
+    "\n<b>Findings:</b>\n#{items}\n"
+  end
+
+  defp format_findings(_), do: ""
 
   defp notify_podcast(pipeline, pid) do
     collect     = Pipeline.get_results(pipeline)["collect"]
