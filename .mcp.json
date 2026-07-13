@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "vox-intelligence": {
+      "type": "http",
+      "url": "http://localhost:8080/api/vox-intelligence/mcp"
+    },
+    "toscanini": {
+      "type": "http",
+      "url": "http://localhost:8080/api/toscanini-mcp/mcp"
+    },
+    "gossip-gate": {
+      "type": "http",
+      "url": "http://localhost:8080/api/gossip-gate/mcp"
+    }
+  }
+}
