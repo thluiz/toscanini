@@ -32,6 +32,10 @@ end
 config :toscanini, :vox_base_url,
   System.get_env("VOX_BASE_URL", "https://vox.thluiz.com")
 
+# URL pública do Scholion (para o link nas notificações de nota publicada)
+config :toscanini, :scholion_base_url,
+  System.get_env("SCHOLION_BASE_URL", "https://scholion.thluiz.com")
+
 # Token da app do Facebook (formato APP_ID|APP_SECRET) para recrawl de previews
 config :toscanini, :facebook_app_token,
   System.get_env("FACEBOOK_APP_TOKEN", "")

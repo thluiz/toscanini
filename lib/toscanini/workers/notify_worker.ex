@@ -10,7 +10,47 @@ defmodule Toscanini.Workers.NotifyWorker do
 
   @impl Oban.Worker
   def perform(%{args: %{"pipeline_id" => pid}}) do
-    pipeline    = Repo.get!(Pipeline, pid)
+    pipeline = Repo.get!(Pipeline, pid)
+
+    case pipeline.content_type do
+      "scholion_quote" -> notify_scholion(pipeline, pid)
+      _ -> notify_podcast(pipeline, pid)
+    end
+  end
+
+  defp notify_scholion(pipeline, pid) do
+    results = Pipeline.get_results(pipeline)
+    synth   = results["scholion_synthesize"] || %{}
+    slug       = synth["slug"]
+    title      = synth["title"] || slug
+    verdict    = synth["verdict"]
+    lexical    = synth["lexical_warnings"] || []
+    authorship = synth["authorship"] || %{}
+
+    base = Application.get_env(:toscanini, :scholion_base_url, "https://scholion.thluiz.com")
+    url  = "#{String.trim_trailing(base, "/")}/notes/#{slug}/"
+
+    flag = if verdict == "yellow", do: "\n⚠️ ghost-audit: yellow (revisar)", else: ""
+
+    auth_flag =
+      if authorship["verified"] == false,
+        do: "\n🔎 autoria não verificada — conferir: #{escape(to_string(authorship["notes"]))}",
+        else: ""
+
+    lex = if lexical == [], do: "", else: "\n📝 lexical: #{escape(Enum.join(lexical, "; "))}"
+
+    msg =
+      "✅ <b>#{escape(title)}</b>\n" <>
+        "<i>Scholion — citação</i>#{flag}#{auth_flag}#{lex}\n" <>
+        "🔗 <a href=\"#{url}\">#{escape(url)}</a>"
+
+    GossipGate.send(msg)
+    Pipeline.save_result(pipeline, "notify", %{"done" => true})
+    Dispatcher.advance(pid)
+    :ok
+  end
+
+  defp notify_podcast(pipeline, pid) do
     collect     = Pipeline.get_results(pipeline)["collect"]
     write_files = Pipeline.get_results(pipeline)["write_files"] || %{}
     json_path   = collect["json"]
