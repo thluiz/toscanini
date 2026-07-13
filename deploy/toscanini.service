@@ -25,6 +25,11 @@ Environment=HERMES_BASE_URL=http://localhost:8080
 # Environment=TOSCANINI_DB_PATH=/home/hermes/services/toscanini/data/orchestrator.db
 Environment=TOSCANINI_COLLECTED_DIR=/home/hermes/collected
 Environment=TOSCANINI_VOX_CONTENT_DIR=/home/hermes/vox-content
+# Clone do repo de CONTEÚDO Scholion (content/notes/) — destino do publish/scholion.
+# Remote deve usar um host alias com deploy key de WRITE (ver deploy/README.md).
+Environment=TOSCANINI_SCHOLION_DIR=/home/hermes/scholion
+# URL pública do Scholion (link nas notificações). Default no runtime.exs.
+# Environment=SCHOLION_BASE_URL=https://scholion.thluiz.com
 Environment=TOSCANINI_VOX_PUBLISH_BIN=/home/hermes/.local/bin/vox-publish
 Environment=GOSSIPGATE_API_KEY=<REDACTED:GOSSIPGATE_API_KEY>
 Environment=VOX_BASE_URL=https://vox.thluiz.com

@@ -10,6 +10,11 @@ defmodule Toscanini.Pipeline.Dispatcher do
     "enrich_tags"   => {:write_files,             Workers.WriteFilesWorker,             :default},
     "write_files"   => {:git_commit,              Workers.GitCommitWorker,              :git_commit},
     "git_commit"    => {:notify,                  Workers.NotifyWorker,                 :default},
+    # Scholion quote publish flow (POST /publish/scholion)
+    "scholion_queued"     => {:scholion_synthesize, Workers.ScholionSynthesizeWorker,   :default},
+    "scholion_synthesize" => {:scholion_write,      Workers.ScholionWriteWorker,        :default},
+    "scholion_write"      => {:scholion_commit,     Workers.ScholionCommitWorker,       :git_commit},
+    "scholion_commit"     => {:notify,              Workers.NotifyWorker,               :default},
     "vox_publish"   => {:verify_url,              Workers.VerifyUrlWorker,              :default},
     "verify_url"    => {:facebook_cache_refresh,  Workers.FacebookCacheRefreshWorker,   :default},
     "facebook_cache_refresh" => {:notify,         Workers.NotifyWorker,                 :default},
