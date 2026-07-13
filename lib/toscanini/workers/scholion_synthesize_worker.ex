@@ -22,7 +22,9 @@ defmodule Toscanini.Workers.ScholionSynthesizeWorker do
     synth_input = %{
       quote: input["quote"],
       presumed_author: input["presumed_author"],
-      context: input["context"]
+      context: input["context"],
+      source_url: input["source_url"],
+      from_book: input["from_book"]
     }
 
     case VoxIntelligence.synthesize_quote(synth_input) do
