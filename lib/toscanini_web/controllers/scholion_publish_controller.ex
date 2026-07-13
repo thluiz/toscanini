@@ -12,6 +12,8 @@ defmodule ToscaniniWeb.ScholionPublishController do
       "quote"          => quote,
       "presumed_author" => params["presumed_author"],
       "context"        => params["context"],
+      "source_url"     => params["source_url"],
+      "from_book"      => params["from_book"],
       # date com o relógio real do host (ISO 8601 + offset), como a skill faz.
       "date"           => real_date()
     }
