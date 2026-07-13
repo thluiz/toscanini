@@ -15,8 +15,10 @@ defmodule Toscanini.Workers.ScholionCommitWorker do
     results = Pipeline.get_results(pipeline)
     dest = results["scholion_write"]["dest"]
     title = get_in(results, ["scholion_synthesize", "title"]) || "nota"
+    draft = get_in(results, ["scholion_synthesize", "draft"]) == true
+    msg = if draft, do: "note(draft): #{title}", else: "note: #{title}"
 
-    case Toscanini.Git.commit_and_push(scholion_dir, [dest], "note: #{title}") do
+    case Toscanini.Git.commit_and_push(scholion_dir, [dest], msg) do
       {:ok, output} ->
         Pipeline.save_result(pipeline, "scholion_commit", %{"done" => true, "output" => output})
         Dispatcher.advance(pid)
