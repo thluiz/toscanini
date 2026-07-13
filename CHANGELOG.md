@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.2.10] — 2026-07-13
+
+### Serialização determinística da nota (JSON do LLM → markdown no Toscanini)
+
+O preset quote-note do vox-intelligence passou a devolver CAMPOS estruturados
+(JSON) em vez do markdown pronto; o Toscanini serializa frontmatter + corpo.
+Elimina na raiz a classe de bugs de formatação (`---` de fechamento faltando,
+aspas mal escapadas) que quebravam o build do Hugo — o YAML agora é gerado por
+código, determinístico. Respeita o boundary: vox-intelligence = só LLM,
+Toscanini = como publicar.
+
+- **`lib/toscanini/scholion/note.ex`** — novo serializer determinístico (aspas
+  corretas por campo: title/sources em duplas, summary/date em simples; `---` de
+  fechamento sempre presente; `draft: true` opcional).
+- **`lib/toscanini/workers/scholion_synthesize_worker.ex`** — serializa via
+  `Note.to_markdown`, roda o ghost-audit sobre a nota, re-serializa com draft se
+  `red`. Removidos `extract_title` e `mark_as_draft` (viraram serialização).
+- **`lib/toscanini/clients/vox_intelligence.ex`** — `synthesize_quote/1` passa a
+  receber os campos estruturados.
+
 ## [0.2.9] — 2026-07-13
 
 ### ghost-audit red vira `draft: true` (nota versionada) em vez de rascunho perdido

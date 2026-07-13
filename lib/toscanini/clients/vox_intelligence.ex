@@ -38,14 +38,13 @@ defmodule Toscanini.Clients.VoxIntelligence do
     body = %{
       "quote"          => input.quote,
       "presumedAuthor" => Map.get(input, :presumed_author),
-      "context"        => Map.get(input, :context),
-      "date"           => input.date
+      "context"        => Map.get(input, :context)
     }
 
     case Req.post("#{base_url()}/api/vox-intelligence/presets/scholion/quote-note",
            json: body,
            receive_timeout: 300_000) do
-      {:ok, %{status: 200, body: %{"slug" => _, "note" => _} = result}} ->
+      {:ok, %{status: 200, body: %{"slug" => _, "body" => _} = result}} ->
         {:ok, result}
 
       {:ok, %{status: s, body: b}} ->
