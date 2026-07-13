@@ -48,41 +48,80 @@ defmodule Toscanini.Workers.ScholionSynthesizeWorker do
 
     verdict = audit["verdict"]
 
+    # Salva sempre a nota + diagnóstico do audit (inclusive quando red), para
+    # inspeção via GET /jobs/:id mesmo que o pipeline pare.
+    Pipeline.save_result(pipeline, "scholion_synthesize", %{
+      "slug"             => slug,
+      "note"             => note,
+      "title"            => title,
+      "authorship"       => authorship,
+      "verdict"          => verdict,
+      "findings"         => audit["findings"] || [],
+      "summary"          => audit["summary"],
+      "lexical_warnings" => lexical
+    })
+
     # Só o ghost-audit `red` para o pipeline. Autoria não verificada publica
     # com flag (o solicitante forneceu a fonte) — sinalizada na notificação.
-    cond do
-      verdict == "red" ->
-        halt(pipeline, slug, title, "ghost-audit verdict=red: #{audit["summary"]}")
-
-      true ->
-        Pipeline.save_result(pipeline, "scholion_synthesize", %{
-          "slug"             => slug,
-          "note"             => note,
-          "title"            => title,
-          "authorship"       => authorship,
-          "verdict"          => verdict,
-          "findings"         => audit["findings"] || [],
-          "lexical_warnings" => lexical
-        })
-
-        Dispatcher.advance(pid)
-        :ok
+    if verdict == "red" do
+      halt(pipeline, slug, title, note, "ghost-audit verdict=red: #{audit["summary"]}", audit["findings"] || [])
+    else
+      Dispatcher.advance(pid)
+      :ok
     end
   end
 
-  # Para o pipeline (status failed) e notifica; não publica.
-  defp halt(pipeline, slug, title, reason) do
+  # Para o pipeline (status failed) e dá feedback acionável: salva o rascunho
+  # em arquivo (para corrigir ou abandonar) e notifica com os findings do
+  # ghost-audit (o que precisa ser corrigido). Não publica.
+  defp halt(pipeline, slug, title, note, reason, findings) do
+    drafts_dir = System.get_env("TOSCANINI_SCHOLION_DRAFTS_DIR", "/home/hermes/scholion-drafts")
+    draft_path = Path.join(drafts_dir, slug <> ".md")
+
+    draft_line =
+      case File.mkdir_p(drafts_dir) do
+        :ok ->
+          File.write!(draft_path, note)
+          "\n📝 rascunho salvo: <code>#{esc(draft_path)}</code>"
+
+        {:error, e} ->
+          "\n⚠️ falha ao salvar rascunho (#{esc(to_string(e))})"
+      end
+
     Pipeline.fail(pipeline, reason)
 
     GossipGate.send(
-      "⚠️ <b>Scholion — revisão necessária</b>\n" <>
+      "🛑 <b>Scholion — nota barrada (ghost-audit red)</b>\n" <>
         "<i>#{esc(title)}</i>\n" <>
-        "slug: <code>#{esc(slug)}</code>\n" <>
-        "#{esc(reason)}\n\nNota NÃO publicada."
+        "slug: <code>#{esc(slug)}</code>\n\n" <>
+        "<b>Motivo:</b> #{esc(reason)}\n" <>
+        format_findings(findings) <>
+        draft_line <>
+        "\n🔎 job: <code>#{esc(pipeline.id)}</code>\n\n" <>
+        "Corrija o rascunho e republique, ou abandone."
     )
 
     :ok
   end
+
+  defp format_findings([]), do: ""
+
+  defp format_findings(findings) when is_list(findings) do
+    items =
+      findings
+      |> Enum.take(8)
+      |> Enum.map(fn f ->
+        type = f["type"] || f["severity"] || f["kind"] || ""
+        msg = f["message"] || f["msg"] || f["detail"] || inspect(f)
+        prefix = if type == "", do: "", else: "#{esc(to_string(type))}: "
+        "• #{prefix}#{esc(to_string(msg))}"
+      end)
+      |> Enum.join("\n")
+
+    "\n<b>Findings:</b>\n#{items}\n"
+  end
+
+  defp format_findings(_), do: ""
 
   defp extract_title(note) when is_binary(note) do
     case Regex.run(~r/^title:\s*"(.+?)"\s*$/m, note) do
