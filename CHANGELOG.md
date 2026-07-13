@@ -1,5 +1,49 @@
 # Changelog
 
+## [0.2.7] — 2026-07-13
+
+### Versiona o endpoint `GET /api/orchestrator/status`
+
+O snapshot da fila consumido pela skill `toscanini-status` existia apenas como
+hot-patch não versionado no host. Este release traz o código para o repositório.
+
+- **`lib/toscanini/status.ex`** — coleta o snapshot (totals, steps, transcribe,
+  executing, falhas recentes na última hora).
+- **`lib/toscanini_web/controllers/status_controller.ex`** — `GET /status`.
+- **`lib/toscanini_web/router.ex`** — rota `/status`.
+
+## [0.2.6] — 2026-07-13
+
+### Endpoint `POST /publish/scholion` — publica notas de citação no Scholion
+
+Novo endpoint que replica a skill `add-scholion-quote` de forma programática:
+recebe `{quote, presumed_author?, context?}`, delega a síntese ao preset
+`quote-note` do vox-intelligence (pesquisa de autoria + composição da nota sob
+source-or-silence) e publica no repo de conteúdo Scholion.
+
+- **`lib/toscanini_web/controllers/scholion_publish_controller.ex`** — endpoint;
+  gera `date` com o relógio real do host e cria o pipeline `scholion_quote`.
+- **`lib/toscanini/pipeline/dispatcher.ex`** — pipeline scholion:
+  `scholion_synthesize → scholion_write → scholion_commit → notify` (steps com
+  chaves próprias; não reusa `write_files`/`git_commit`, que são do podcast).
+- **`lib/toscanini/workers/scholion_synthesize_worker.ex`** — chama o preset e
+  aplica o portão ghost-audit: verdict `red` interrompe o pipeline; autoria não
+  verificada publica com flag na notificação.
+- **`lib/toscanini/workers/scholion_write_worker.ex`** — escreve
+  `content/notes/<slug>.md` em `TOSCANINI_SCHOLION_DIR` (markdown já pronto do
+  preset, sem renderer).
+- **`lib/toscanini/workers/scholion_commit_worker.ex`** — commit/push da nota.
+- **`lib/toscanini/git.ex`** — novo `Toscanini.Git.commit_and_push/3`, git
+  parametrizado por diretório de repo, extraído de `git_commit_worker.ex` (que
+  passa a reusá-lo). A auth (deploy key) é resolvida pelo remote do clone via
+  `~/.ssh/config` — nenhuma chave no código.
+- **`lib/toscanini/clients/vox_intelligence.ex`** — `synthesize_quote/1` e
+  `ghost_audit/2`.
+- **`lib/toscanini/workers/notify_worker.ex`** — notificação branchada por
+  `content_type` (link `scholion.thluiz.com/notes/<slug>/`).
+- **`config/runtime.exs`, `deploy/toscanini.service`, `deploy/README.md`** — nova
+  env `TOSCANINI_SCHOLION_DIR` e provisão da deploy key de conteúdo Scholion.
+
 ## [0.2.5] — 2026-07-02
 
 ### Download de áudio: `verify_none` para contornar TLS strict do OTP 27
