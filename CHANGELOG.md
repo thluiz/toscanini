@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.2.11] — 2026-07-13
+
+### Modo livro no publish/scholion (source_url / from_book)
+
+Threading dos sinais de "veio de um livro" até o preset: o endpoint aceita
+`source_url` (link Amazon/Kindle) e `from_book`, propagados para o quote-note.
+Com isso o preset registra o link como source e compõe um corpo mínimo (só
+situa), reduzindo os reds por filler. O portão segue igual (red → draft).
+
+- **`lib/toscanini_web/controllers/scholion_publish_controller.ex`**,
+  **`lib/toscanini/workers/scholion_synthesize_worker.ex`**,
+  **`lib/toscanini/clients/vox_intelligence.ex`** — repassam `source_url` e
+  `from_book` ao preset.
+
 ## [0.2.10] — 2026-07-13
 
 ### Serialização determinística da nota (JSON do LLM → markdown no Toscanini)

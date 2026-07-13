@@ -38,7 +38,9 @@ defmodule Toscanini.Clients.VoxIntelligence do
     body = %{
       "quote"          => input.quote,
       "presumedAuthor" => Map.get(input, :presumed_author),
-      "context"        => Map.get(input, :context)
+      "context"        => Map.get(input, :context),
+      "sourceUrl"      => Map.get(input, :source_url),
+      "fromBook"       => Map.get(input, :from_book)
     }
 
     case Req.post("#{base_url()}/api/vox-intelligence/presets/scholion/quote-note",
