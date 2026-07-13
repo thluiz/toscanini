@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.2.9] — 2026-07-13
+
+### ghost-audit red vira `draft: true` (nota versionada) em vez de rascunho perdido
+
+Antes, um verdict `red` parava o pipeline e salvava a nota num diretório à parte
+(`scholion-drafts`), fácil de esquecer. Agora a nota é commitada normalmente em
+`content/notes/<slug>.md` com `draft: true` no frontmatter — versionada e
+corrigível no lugar certo, mas fora do ar (Hugo não builda drafts sem
+`--buildDrafts`).
+
+- **`lib/toscanini/workers/scholion_synthesize_worker.ex`** — no `red`, injeta
+  `draft: true` no frontmatter e segue o pipeline (write → commit → notify) em
+  vez de parar; removido o diretório `scholion-drafts` e o `Pipeline.fail`.
+- **`lib/toscanini/workers/scholion_commit_worker.ex`** — mensagem
+  `note(draft): <title>` quando draft.
+- **`lib/toscanini/workers/notify_worker.ex`** — notificação de draft com os
+  findings do ghost-audit (o que corrigir) + o `job_id`.
+
 ## [0.2.8] — 2026-07-13
 
 ### Feedback acionável quando o ghost-audit barra a nota (red)
