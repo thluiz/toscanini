@@ -9,6 +9,7 @@ defmodule ToscaniniWeb.Router do
     pipe_through :api
 
     get  "/health",           HealthController, :index
+    get  "/status",           StatusController, :index
     post "/jobs",             JobController, :create
     get  "/jobs/:id",         JobController, :show
     post "/batch",            BatchController, :create
