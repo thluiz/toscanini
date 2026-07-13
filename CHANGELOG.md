@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.2.8] — 2026-07-13
+
+### Feedback acionável quando o ghost-audit barra a nota (red)
+
+Antes, um verdict `red` parava o pipeline mas descartava a nota composta e
+notificava só com o resumo — impossível corrigir sem recompor do zero.
+
+- **`lib/toscanini/workers/scholion_synthesize_worker.ex`**:
+  - Salva sempre a nota + verdict + findings em `results.scholion_synthesize`
+    (inspecionável via `GET /jobs/:id`), inclusive quando o pipeline para.
+  - No `red`, grava o rascunho em `TOSCANINI_SCHOLION_DRAFTS_DIR`
+    (default `/home/hermes/scholion-drafts/<slug>.md`) para corrigir ou
+    abandonar, e a notificação passa a listar os **findings** do ghost-audit
+    (o que precisa ser corrigido) + o `job_id`.
+
 ## [0.2.7] — 2026-07-13
 
 ### Versiona o endpoint `GET /api/orchestrator/status`
