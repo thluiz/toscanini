@@ -28,6 +28,47 @@ defmodule Toscanini.Collectors.Pocketcasts do
     end
   end
 
+  @doc """
+  Extrai o podcast_uuid (1º UUID) de uma URL de podcast/episódio PocketCasts que
+  JÁ contém UUIDs no path. Não segue redirects — use `resolve_podcast_uuid/1`
+  para short links pca.st/CODE.
+  """
+  def podcast_uuid_from_url(url) do
+    case extract_uuids(url) do
+      {:ok, podcast_uuid, _episode_uuid} -> {:ok, podcast_uuid}
+      {:error, _} = err                  -> err
+    end
+  end
+
+  @doc """
+  Resolve o podcast_uuid a partir de qualquer URL PocketCasts, incluindo short
+  links `pca.st/CODE` — que fazem 302 para `pocketcasts.com/podcast/{slug}/{uuid}`.
+  Tenta extrair o UUID direto; se não houver, segue o redirect e extrai da URL
+  final. Devolve `{:ok, uuid}` ou `{:error, reason}`.
+  """
+  def resolve_podcast_uuid(url) do
+    case extract_uuids(url) do
+      {:ok, podcast_uuid, _} ->
+        {:ok, podcast_uuid}
+
+      {:error, _} ->
+        with {:ok, final} <- resolve_url(url) do
+          case extract_uuids(final) do
+            {:ok, podcast_uuid, _} -> {:ok, podcast_uuid}
+            {:error, _} = err      -> err
+          end
+        end
+    end
+  end
+
+  @doc """
+  Monta uma URL de episódio submetível ao pipeline. O collector resolve o par
+  podcast/episode diretamente por `extract_uuids` (ambos UUIDs no path).
+  """
+  def episode_url(podcast_uuid, episode_uuid) do
+    "https://pocketcasts.com/podcast/#{podcast_uuid}/episode/#{episode_uuid}"
+  end
+
   # 1. Seguir redirect para URL canónica com UUIDs (sem descarregar o body da página)
   defp fetch_metadata(url) do
     # Tenta extrair UUIDs da URL original antes de seguir redirects.
@@ -120,10 +161,45 @@ defmodule Toscanini.Collectors.Pocketcasts do
   # como pela busca especulativa em podcasts conhecidos.
   # Req descomprime gzip e faz JSON decode automaticamente.
   defp fetch_episode(podcast_uuid, episode_uuid) do
-    opts = [headers: [{"user-agent", "Mozilla/5.0"}]]
+    case fetch_podcast_episodes(podcast_uuid) do
+      {:ok, %{episodes: episodes, podcast_info: podcast_info}} ->
+        case Enum.find(episodes, &(&1["uuid"] == episode_uuid)) do
+          nil -> {:error, :not_in_feed}
+          ep  -> {:ok, ep, podcast_info}
+        end
 
-    case Req.get("#{@api_base}/podcast/full/#{podcast_uuid}", opts) do
-      {:ok, %{status: 200, body: data}} ->
+      {:not_modified, _} ->
+        {:error, :not_in_feed}
+
+      {:error, _} = err ->
+        err
+    end
+  end
+
+  @doc """
+  Busca o feed completo de um podcast na API PocketCasts e devolve todos os
+  episódios (não só um). Partilhado por `fetch_episode/2` (filtra por UUID) e
+  pelo `FeedCheckWorker` (deteta episódios novos).
+
+  Suporta conditional GET: passe `:etag` e/ou `:last_modified` em `opts` e, se o
+  servidor honrar, devolve `{:not_modified, %{etag: ..., last_modified: ...}}`
+  sem re-parsear o corpo. Devolve:
+
+    * `{:ok, %{episodes: [...], podcast_info: %{...}, etag: ..., last_modified: ...}}`
+    * `{:not_modified, %{etag: ..., last_modified: ...}}`
+    * `{:error, reason}`
+  """
+  def fetch_podcast_episodes(podcast_uuid, opts \\ []) do
+    headers =
+      [{"user-agent", "Mozilla/5.0"}]
+      |> maybe_header("if-none-match", Keyword.get(opts, :etag))
+      |> maybe_header("if-modified-since", Keyword.get(opts, :last_modified))
+
+    case Req.get("#{@api_base}/podcast/full/#{podcast_uuid}", headers: headers, retry: false) do
+      {:ok, %{status: 304, headers: resp_headers}} ->
+        {:not_modified, cache_headers(resp_headers)}
+
+      {:ok, %{status: 200, body: data, headers: resp_headers}} ->
         parsed = ensure_map(data)
         podcast = parsed["podcast"] || %{}
         podcast_info = %{
@@ -133,12 +209,12 @@ defmodule Toscanini.Collectors.Pocketcasts do
           category:  podcast["category"],
           show_type: podcast["show_type"]
         }
-        episodes = podcast["episodes"] || []
 
-        case Enum.find(episodes, &(&1["uuid"] == episode_uuid)) do
-          nil -> {:error, :not_in_feed}
-          ep  -> {:ok, ep, podcast_info}
-        end
+        {:ok,
+         Map.merge(cache_headers(resp_headers), %{
+           episodes:     podcast["episodes"] || [],
+           podcast_info: podcast_info
+         })}
 
       {:ok, %{status: s}} ->
         {:error, "podcast API HTTP #{s}"}
@@ -146,6 +222,17 @@ defmodule Toscanini.Collectors.Pocketcasts do
       {:error, e} ->
         {:error, inspect(e)}
     end
+  end
+
+  defp maybe_header(headers, _name, nil), do: headers
+  defp maybe_header(headers, _name, ""), do: headers
+  defp maybe_header(headers, name, value), do: [{name, value} | headers]
+
+  defp cache_headers(headers) do
+    %{
+      etag:          headers |> Map.get("etag", []) |> List.first(),
+      last_modified: headers |> Map.get("last-modified", []) |> List.first()
+    }
   end
 
   # Suporta tanto body já decodificado (map) quanto binary (gzip ou JSON raw)

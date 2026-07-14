@@ -1,6 +1,44 @@
 defmodule Toscanini.Batches do
   import Ecto.Query
-  alias Toscanini.{Repo, Batch, BatchItem}
+  alias Toscanini.{Repo, Batch, BatchItem, Pipeline}
+  alias Toscanini.Pipeline.Dispatcher
+
+  @doc """
+  Cria um batch e já submete o primeiro item ao pipeline. Caminho único
+  partilhado pela entrada manual (BatchController) e pela automática
+  (FeedCheckWorker), garantindo que ambas se comportam igual.
+
+  Devolve `{:ok, batch, first_pipeline_id}` ou `{:error, :no_urls}`.
+  """
+  def start_batch(urls_list, collector \\ "pocketcasts", extra_params \\ %{})
+
+  def start_batch([], _collector, _extra_params), do: {:error, :no_urls}
+
+  def start_batch(urls_list, collector, extra_params) do
+    {:ok, batch} = create_batch(urls_list, collector, extra_params)
+
+    first_item  = next_pending_item(batch.id)
+    pipeline_id = Ecto.UUID.generate()
+
+    pipeline_params =
+      extra_params
+      |> Map.put("batch_id",      batch.id)
+      |> Map.put("batch_item_id", first_item.id)
+      |> Map.put("url",           first_item.url)
+
+    Repo.insert!(%Pipeline{
+      id:           pipeline_id,
+      content_type: "podcast",
+      collector:    collector,
+      status:       "queued",
+      params:       Jason.encode!(pipeline_params)
+    })
+
+    mark_item_running(first_item, pipeline_id)
+    Dispatcher.advance(pipeline_id)
+
+    {:ok, batch, pipeline_id}
+  end
 
   def create_batch(urls_list, collector \\ "pocketcasts", extra_params \\ %{}) do
     id = Ecto.UUID.generate()

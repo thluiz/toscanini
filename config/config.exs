@@ -16,7 +16,12 @@ config :toscanini, ToscaniniWeb.Endpoint,
 config :toscanini, Oban,
   engine: Oban.Engines.Lite,
   repo: Toscanini.Repo,
-  queues: [collectors: 3, digest: 1, default: 5, git_commit: 1, vox_publish: 1, transcribe: 2]
+  queues: [collectors: 3, digest: 1, default: 5, git_commit: 1, vox_publish: 1, transcribe: 2, feeds: 1],
+  plugins: [
+    # Varre assinaturas de feed de hora em hora (no minuto 0). O worker gateia
+    # cada assinatura por janela quente/idle, então isto é barato (conditional GET).
+    {Oban.Plugins.Cron, crons: [{"0 * * * *", Toscanini.Workers.FeedSweepWorker}]}
+  ]
 
 config :logger, :default_formatter,
   format: "$time $metadata[$level] $message\n",

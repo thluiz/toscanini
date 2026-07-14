@@ -22,5 +22,12 @@ defmodule ToscaniniWeb.Router do
     put  "/scheduler/configs/:queue",  SchedulerController, :update
     get  "/pipelines/find",           PipelineController, :find_by_url
     post "/pipelines/:id/prioritize", PipelineController, :prioritize
+
+    post   "/subscriptions",           FeedController, :create
+    get    "/subscriptions",           FeedController, :index
+    get    "/subscriptions/:id",       FeedController, :show
+    put    "/subscriptions/:id",       FeedController, :update
+    delete "/subscriptions/:id",       FeedController, :delete
+    post   "/subscriptions/:id/check", FeedController, :check_now
   end
 end
