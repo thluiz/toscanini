@@ -8,8 +8,8 @@ como tools para o Claude Code. É um proxy fino sobre a API HTTP do Toscanini
 
 `submit_job`, `submit_batch`, `get_job`, `get_batch`, `wait_job`, `wait_batch`,
 `find_job_by_url`, `prioritize_job`, `publish_podcast`, `get_scheduler_config`,
-`set_scheduler_config`, `subscribe_feed`, `list_feeds`, `check_feed_now`,
-`unsubscribe_feed`, `get_feeds_config`, `set_feeds_config`.
+`set_scheduler_config`, `subscribe_feed`, `update_feed`, `list_feeds`,
+`check_feed_now`, `unsubscribe_feed`, `get_feeds_config`, `set_feeds_config`.
 
 ## Rodar
 

@@ -86,6 +86,7 @@ defmodule ToscaniniWeb.FeedController do
       feed_ref:          s.feed_ref,
       title:             s.title,
       active:            s.active,
+      auto_annotate:     s.auto_annotate,
       check_days:        FeedSubscription.check_days(s),
       hot_interval_min:  s.hot_interval_min,
       idle_interval_min: s.idle_interval_min,

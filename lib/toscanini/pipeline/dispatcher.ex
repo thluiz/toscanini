@@ -6,7 +6,10 @@ defmodule Toscanini.Pipeline.Dispatcher do
     nil             => {:collect,                 Workers.CollectWorker,                :collectors},
     "collect"       => {:transcribe,              Workers.TranscribeWorker,             :transcribe},
     "transcribe"    => {:summarize,               Workers.SummarizeWorker,              :default},
-    "summarize"     => {:enrich_tags,             Workers.EnrichTagsWorker,             :default},
+    "summarize"     => {:annotate,                Workers.AnnotateWorker,               :default},
+    # Etapa de anotação automática. No-op (só avança) se params.auto_annotate for
+    # falso — a etapa existe no fluxo pra todos, mas só executa nos feeds marcados.
+    "annotate"      => {:enrich_tags,             Workers.EnrichTagsWorker,             :default},
     "enrich_tags"   => {:write_files,             Workers.WriteFilesWorker,             :default},
     "write_files"   => {:git_commit,              Workers.GitCommitWorker,              :git_commit},
     "git_commit"    => {:s3_archive,              Workers.S3ArchiveWorker,              :default},

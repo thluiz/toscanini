@@ -26,6 +26,56 @@ defmodule Toscanini.Clients.VoxIntelligence do
   end
 
   @doc """
+  Primeira fase da anotação automática (preset `podcast/suggest-annotations`,
+  modelo barato): analisa o transcript e devolve 8–20 sugestões de pontos dignos
+  de anotação. Espelha a skill `suggest-annotations`.
+
+  `episode` é o objeto do episódio (transcript obrigatório; metadata, lang,
+  summary, participants, annotations existentes ajudam o contexto).
+
+  Retorna `{:ok, %{"suggestions" => [%{"ts" => ..., "tier" => ...,
+  "title" => ..., "description" => ..., "quote" => ...}], "stats" => %{...}}}`.
+  """
+  def suggest_annotations(episode) when is_map(episode) do
+    case Req.post("#{base_url()}/api/vox-intelligence/presets/podcast/suggest-annotations",
+           json: %{"episode" => episode},
+           receive_timeout: 300_000) do
+      {:ok, %{status: 200, body: %{"x-parsed" => result}}} ->
+        {:ok, result}
+
+      {:ok, %{status: s, body: b}} ->
+        {:error, "vox-intelligence suggest-annotations HTTP #{s}: #{inspect(b)}"}
+
+      {:error, e} ->
+        {:error, inspect(e)}
+    end
+  end
+
+  @doc """
+  Segunda fase da anotação automática (preset `podcast/annotate`): dado o
+  transcript e uma lista de bookmarks (timestamps), devolve a anotação rica de
+  cada um. Espelha a skill `podcast-annotate`.
+
+  `bookmarks` é uma lista de mapas `%{"time" => "HH:MM:SS"}` (com `"note"`
+  opcional). Retorna `{:ok, [%{"time" => ..., "title" => ...,
+  "description" => ...}]}` (o preset devolve uma lista direta em `x-parsed`).
+  """
+  def annotate(transcript, bookmarks) when is_binary(transcript) and is_list(bookmarks) do
+    case Req.post("#{base_url()}/api/vox-intelligence/presets/podcast/annotate",
+           json: %{"transcript" => transcript, "bookmarks" => bookmarks},
+           receive_timeout: 600_000) do
+      {:ok, %{status: 200, body: %{"x-parsed" => result}}} when is_list(result) ->
+        {:ok, result}
+
+      {:ok, %{status: s, body: b}} ->
+        {:error, "vox-intelligence annotate HTTP #{s}: #{inspect(b)}"}
+
+      {:error, e} ->
+        {:error, inspect(e)}
+    end
+  end
+
+  @doc """
   Sintetiza uma nota de citação Scholion (add-scholion-quote) a partir de uma
   frase crua + autor presumido. O preset pesquisa autoria na web e compõe a
   nota inteira (frontmatter + corpo), sob source-or-silence.

@@ -182,7 +182,11 @@ defmodule Toscanini.Feeds do
           {:ok, :no_change}
         else
           urls = Enum.map(new, fn {ep, _dt} -> Pocketcasts.episode_url(sub.feed_ref, ep["uuid"]) end)
-          {:ok, batch, _pid} = Batches.start_batch(urls, "pocketcasts", %{})
+          # Propaga a flag do feed para os params do pipeline (via extra_params do
+          # batch, herdada por todos os itens em BatchAdvanceWorker). O
+          # AnnotateWorker lê "auto_annotate" e faz no-op se falso.
+          {:ok, batch, _pid} =
+            Batches.start_batch(urls, "pocketcasts", %{"auto_annotate" => sub.auto_annotate})
 
           {latest_dt, latest_uuid} = latest_episode(Enum.map(new, fn {ep, _} -> ep end))
 
@@ -258,7 +262,7 @@ defmodule Toscanini.Feeds do
 
   defp resolve_feed_ref(_), do: {:error, :missing_feed_ref}
 
-  @allowed_keys ~w(source feed_ref url title active check_days
+  @allowed_keys ~w(source feed_ref url title active auto_annotate check_days
                    hot_interval_min idle_interval_min)a
 
   # Aceita chaves string (HTTP/JSON) ou atom; ignora chaves desconhecidas;
