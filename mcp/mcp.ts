@@ -298,7 +298,40 @@ const TOOLS = [
           type: "number",
           description: "Minutes between safety checks outside the hot window (default 1440 = daily).",
         },
+        auto_annotate: {
+          type: "boolean",
+          description:
+            "When true, each new episode is auto-annotated (suggest-annotations → annotate) before " +
+            "publishing, filling the episode's `annotations` field. Default false. Toggle later with update_feed.",
+        },
       },
+    },
+  },
+  {
+    name: "update_feed",
+    description:
+      "Update an existing feed subscription (from list_feeds). Any provided field is changed; omitted " +
+      "fields are left as-is. Use to toggle auto_annotate on/off for a program, pause it (active), or " +
+      "adjust the check schedule.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: { type: "string", description: "Subscription ID (from list_feeds)." },
+        auto_annotate: {
+          type: "boolean",
+          description: "Enable/disable auto-annotation before publishing for this feed.",
+        },
+        active: { type: "boolean", description: "Enable/disable checking this subscription." },
+        title: { type: "string", description: "Display title." },
+        check_days: {
+          type: "array",
+          items: { type: "string" },
+          description: "Weekday abbreviations for the hot window, e.g. ['mon','fri']. [] = hot always on.",
+        },
+        hot_interval_min: { type: "number", description: "Minutes between checks inside the hot window." },
+        idle_interval_min: { type: "number", description: "Minutes between safety checks outside the hot window." },
+      },
+      required: ["id"],
     },
   },
   {
@@ -391,6 +424,19 @@ async function toscaniniGet(baseUrl: string, path: string): Promise<unknown> {
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(`Toscanini GET ${path} returned ${res.status}: ${text}`);
+  }
+  return res.json();
+}
+
+async function toscaniniPut(baseUrl: string, path: string, body: unknown): Promise<unknown> {
+  const res = await fetch(`${baseUrl}${path}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Toscanini PUT ${path} returned ${res.status}: ${text}`);
   }
   return res.json();
 }
@@ -548,7 +594,20 @@ async function dispatch(
           if (args.check_days !== undefined) body.check_days = args.check_days;
           if (args.hot_interval_min !== undefined) body.hot_interval_min = args.hot_interval_min;
           if (args.idle_interval_min !== undefined) body.idle_interval_min = args.idle_interval_min;
+          if (args.auto_annotate !== undefined) body.auto_annotate = args.auto_annotate;
           resultData = await toscaniniPost(base, "/subscriptions", body);
+
+        } else if (toolName === "update_feed") {
+          if (!args.id) return err(id, -32602, "Missing required arg: id");
+          const body: Record<string, unknown> = {};
+          if (args.auto_annotate !== undefined) body.auto_annotate = args.auto_annotate;
+          if (args.active !== undefined) body.active = args.active;
+          if (args.title !== undefined) body.title = args.title;
+          if (args.check_days !== undefined) body.check_days = args.check_days;
+          if (args.hot_interval_min !== undefined) body.hot_interval_min = args.hot_interval_min;
+          if (args.idle_interval_min !== undefined) body.idle_interval_min = args.idle_interval_min;
+          if (Object.keys(body).length === 0) return err(id, -32602, "Provide at least one field to update");
+          resultData = await toscaniniPut(base, "/subscriptions/" + args.id, body);
 
         } else if (toolName === "list_feeds") {
           resultData = await toscaniniGet(base, "/subscriptions");

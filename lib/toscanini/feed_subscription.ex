@@ -10,6 +10,9 @@ defmodule Toscanini.FeedSubscription do
     field :feed_ref,          :string
     field :title,             :string
     field :active,            :boolean, default: true
+    # Quando true, o pipeline roda a etapa de anotação automática (suggest→annotate)
+    # antes de publicar. Só os programas marcados anotam — ver [[AnnotateWorker]].
+    field :auto_annotate,     :boolean, default: false
     # JSON array serializado, ex.: ["thu","fri"]. nil/"[]" → janela quente sempre ligada.
     field :check_days,        :string
     field :hot_interval_min,  :integer, default: 60
@@ -22,7 +25,7 @@ defmodule Toscanini.FeedSubscription do
     timestamps()
   end
 
-  @castable ~w(source feed_ref title active check_days hot_interval_min
+  @castable ~w(source feed_ref title active auto_annotate check_days hot_interval_min
                idle_interval_min last_published_at last_episode_uuid
                last_checked_at etag last_modified)a
 
