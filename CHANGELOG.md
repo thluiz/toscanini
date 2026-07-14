@@ -1,5 +1,36 @@
 # Changelog
 
+## [0.2.19] — 2026-07-14
+
+### Anotação automática por feed — passo `annotate` no pipeline
+
+Alguns programas passam a ser anotados sozinhos assim que um episódio novo é
+publicado, espelhando o fluxo das skills `suggest-annotations` → `podcast-annotate`
+(sem os gates humanos — roda direto no pipeline):
+
+1. `suggest_annotations` (modelo barato) → 8–20 sugestões com timestamps;
+2. `annotate` desses timestamps → anotações ricas (título + descrição);
+3. mescla no campo **`annotations`** do JSON (dedup por janela de 30s vs. as
+   existentes, ordena por `ts`) — **nunca toca no `timeline`**.
+
+**Opt-in por feed** via a flag `auto_annotate` (default `false`): só os feeds
+marcados anotam; entrada manual (`/jobs`) não é afetada. A flag é propagada do
+feed para os `params` do pipeline via `extra_params` do batch (herdada por todos
+os itens). O passo é **não-bloqueante**: falha na vox-intelligence é logada e o
+pipeline segue publicando sem anotações (podem ser adicionadas depois pelas skills).
+
+- **`priv/repo/migrations/20260714120000_add_auto_annotate_to_feed_subscriptions.exs`**
+  — nova coluna `auto_annotate boolean default false`.
+- **`lib/toscanini/feed_subscription.ex`** — campo + castable.
+- **`lib/toscanini/feeds.ex`** — allowlist do update + `check/1` passa a flag ao batch.
+- **`lib/toscanini/clients/vox_intelligence.ex`** — `suggest_annotations/1` e `annotate/2`
+  (presets `podcast/suggest-annotations` e `podcast/annotate`).
+- **`lib/toscanini/workers/annotate_worker.ex`** — novo worker (no-op se a flag for falsa).
+- **`lib/toscanini/pipeline/dispatcher.ex`** — passo `annotate` entre `summarize` e `enrich_tags`.
+- **`lib/toscanini_web/controllers/feed_controller.ex`** — `auto_annotate` no `render_sub`.
+- **`mcp/mcp.ts`** — `subscribe_feed` aceita `auto_annotate`; nova tool `update_feed`
+  (toggla a flag / edita um feed existente).
+
 ## [0.2.18] — 2026-07-14
 
 ### Retenção: varredura diária que apaga áudio local já arquivado no cold
