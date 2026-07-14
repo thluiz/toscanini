@@ -44,6 +44,20 @@ config :toscanini, :facebook_app_token,
 config :toscanini, :facebook_cache_refresh_delay,
   System.get_env("FACEBOOK_REFRESH_DELAY", "120") |> String.to_integer()
 
+# Arquivamento em cold storage (S3). Desligado por padrão — o passo s3_archive é
+# no-op até TOSCANINI_ARCHIVE_ENABLED=true E um bucket configurado. Ver
+# Toscanini.Archive / Toscanini.Workers.S3ArchiveWorker.
+config :toscanini, :archive,
+  enabled:        System.get_env("TOSCANINI_ARCHIVE_ENABLED", "false") == "true",
+  bucket:         System.get_env("TOSCANINI_ARCHIVE_BUCKET", ""),
+  region:         System.get_env("TOSCANINI_ARCHIVE_REGION", "us-east-1"),
+  storage_class:  System.get_env("TOSCANINI_ARCHIVE_STORAGE_CLASS", "DEEP_ARCHIVE"),
+  retention_days: System.get_env("TOSCANINI_ARCHIVE_RETENTION_DAYS", "30") |> String.to_integer(),
+  dry_run:        System.get_env("TOSCANINI_ARCHIVE_DRY_RUN", "true") == "true",
+  backlog_done:   System.get_env("TOSCANINI_ARCHIVE_BACKLOG_DONE", "false") == "true",
+  aws_bin:        System.get_env("TOSCANINI_AWS_BIN", "aws"),
+  profile:        System.get_env("AWS_PROFILE", "")
+
 # Whisper worker — paths configuráveis via env (sem paths hardcoded no código)
 config :toscanini, :whisper_python_path,
   System.fetch_env!("WHISPER_PYTHON_PATH")
