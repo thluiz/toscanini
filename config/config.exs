@@ -20,7 +20,7 @@ config :toscanini, Oban,
   plugins: [
     # Varre assinaturas de feed de hora em hora (no minuto 0). O worker gateia
     # cada assinatura por janela quente/idle, então isto é barato (conditional GET).
-    {Oban.Plugins.Cron, crons: [{"0 * * * *", Toscanini.Workers.FeedSweepWorker}]}
+    {Oban.Plugins.Cron, crontab: [{"0 * * * *", Toscanini.Workers.FeedSweepWorker}]}
   ]
 
 config :logger, :default_formatter,
