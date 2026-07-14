@@ -1,0 +1,10 @@
+{
+  "name": "toscanini-mcp",
+  "version": "1.0.0",
+  "description": "MCP server exposing Toscanini orchestrator operations as typed tools",
+  "scripts": {
+    "start": "bun run server.ts",
+    "dev": "bun --watch run server.ts"
+  },
+  "private": true
+}
