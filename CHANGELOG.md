@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.2.18] — 2026-07-14
+
+### Retenção: varredura diária que apaga áudio local já arquivado no cold
+
+Fecha o ciclo do arquivamento: um cron diário (04:30 UTC) apaga o áudio LOCAL de
+episódios arquivados no cold storage há mais de `retention_days` (default 30),
+liberando o disco do `collected`. Conservador e auto-gated:
+
+1. No-op se `Archive.enabled?/0` for `false`.
+2. No-op se `TOSCANINI_ARCHIVE_BACKLOG_DONE != true` — trava: nunca limpa antes de
+   todo o histórico estar confirmado no cold.
+3. `dry_run` (default `true`) só loga os candidatos, não apaga.
+4. **Nunca apaga sem confirmar o objeto no S3** (`head-object`).
+
+Apaga só o áudio (`collect.mp3`/`collect.audio`); a transcrição do youtube e o mp3
+do podcast já estão no cold. Loga total liberado e notifica no GossipGate.
+
+- **`lib/toscanini/workers/retention_sweep_worker.ex`** — novo worker.
+- **`config/config.exs`** — entrada de crontab `{"30 4 * * *", RetentionSweepWorker}`.
+
 ## [0.2.17] — 2026-07-14
 
 ### Arquivamento em cold storage (S3) — passo `s3_archive` no pipeline
