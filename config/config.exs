@@ -20,7 +20,13 @@ config :toscanini, Oban,
   plugins: [
     # Varre assinaturas de feed de hora em hora (no minuto 0). O worker gateia
     # cada assinatura por janela quente/idle, então isto é barato (conditional GET).
-    {Oban.Plugins.Cron, crontab: [{"0 * * * *", Toscanini.Workers.FeedSweepWorker}]}
+    # Retenção: 1×/dia (04:30 UTC) apaga áudio local já arquivado no cold há >N dias.
+    # O worker é auto-gated (enabled? + backlog_done + dry_run), então é no-op por padrão.
+    {Oban.Plugins.Cron,
+     crontab: [
+       {"0 * * * *", Toscanini.Workers.FeedSweepWorker},
+       {"30 4 * * *", Toscanini.Workers.RetentionSweepWorker}
+     ]}
   ]
 
 config :logger, :default_formatter,
