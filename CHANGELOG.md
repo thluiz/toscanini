@@ -1,5 +1,36 @@
 # Changelog
 
+## [0.2.12] — 2026-07-14
+
+### Assinaturas de feed: download automático de novos episódios (PocketCasts)
+
+Novo produtor a montante do pipeline: cadastra-se um podcast e o Toscanini checa
+periodicamente por episódios novos, baixando e processando sozinho — sem tocar no
+núcleo (Pipeline/Batch). Desenho:
+
+- **Backfill off**: ao assinar grava-se um watermark (`last_published_at`); só
+  episódios publicados **depois** entram. Sem isso, um podcast com 1000 episódios
+  (ex.: Petit Journal) enfileiraria o catálogo inteiro na primeira checagem.
+- **Janela quente**: poll de hora em hora nos dias de publicação (`check_days`),
+  com rede de segurança 1×/dia fora deles (pega episódio reagendado/bônus).
+- **Conditional GET** (ETag/Last-Modified → `304`): a API PocketCasts honra ambos,
+  então checar de hora em hora é quase de graça.
+- **UUID armazenado**: short links `pca.st/CODE` são resolvidos uma única vez no
+  cadastro; só o `podcast_uuid` (`feed_ref`) é persistido — o polling nunca mais
+  toca no short link.
+
+- **`priv/repo/migrations/20260714000001_create_feed_subscriptions.exs`**,
+  **`lib/toscanini/feed_subscription.ex`** — tabela/schema de assinaturas.
+- **`lib/toscanini/feeds.ex`** — contexto (subscribe com watermark, `due?/2`,
+  `check/1` com delta por watermark).
+- **`lib/toscanini/workers/feed_sweep_worker.ex`** (cron horário via
+  `Oban.Plugins.Cron`), **`lib/toscanini/workers/feed_check_worker.ex`** (checa 1).
+- **`lib/toscanini/collectors/pocketcasts.ex`** — extraído
+  `fetch_podcast_episodes/2` (conditional GET) + `resolve_podcast_uuid/1`.
+- **`lib/toscanini/batches.ex`** — `start_batch/3` partilhado por controller e
+  worker. **`lib/toscanini_web/controllers/feed_controller.ex`** + rotas
+  `/subscriptions`. **`config/config.exs`** — fila `feeds` + plugin Cron.
+
 ## [0.2.11] — 2026-07-13
 
 ### Modo livro no publish/scholion (source_url / from_book)

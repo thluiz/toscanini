@@ -1,8 +1,7 @@
 defmodule ToscaniniWeb.BatchController do
   use ToscaniniWeb, :controller
 
-  alias Toscanini.{Repo, Pipeline, Batches}
-  alias Toscanini.Pipeline.Dispatcher
+  alias Toscanini.Batches
 
   def create(conn, params) do
     raw_urls = params["urls"] || ""
@@ -21,28 +20,7 @@ defmodule ToscaniniWeb.BatchController do
       collector    = params["collector"] || "pocketcasts"
       extra_params = %{"force_retranscribe" => params["force_retranscribe"] || false}
 
-      {:ok, batch} = Batches.create_batch(urls, collector, extra_params)
-
-      # Submeter primeiro item
-      first_item  = Batches.next_pending_item(batch.id)
-      pipeline_id = Ecto.UUID.generate()
-
-      pipeline_params =
-        extra_params
-        |> Map.put("batch_id",      batch.id)
-        |> Map.put("batch_item_id", first_item.id)
-        |> Map.put("url",           first_item.url)
-
-      Repo.insert!(%Pipeline{
-        id:           pipeline_id,
-        content_type: "podcast",
-        collector:    collector,
-        status:       "queued",
-        params:       Jason.encode!(pipeline_params)
-      })
-
-      Batches.mark_item_running(first_item, pipeline_id)
-      Dispatcher.advance(pipeline_id)
+      {:ok, batch, pipeline_id} = Batches.start_batch(urls, collector, extra_params)
 
       conn
       |> put_status(202)
