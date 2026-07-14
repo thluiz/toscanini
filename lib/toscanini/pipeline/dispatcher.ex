@@ -9,7 +9,8 @@ defmodule Toscanini.Pipeline.Dispatcher do
     "summarize"     => {:enrich_tags,             Workers.EnrichTagsWorker,             :default},
     "enrich_tags"   => {:write_files,             Workers.WriteFilesWorker,             :default},
     "write_files"   => {:git_commit,              Workers.GitCommitWorker,              :git_commit},
-    "git_commit"    => {:notify,                  Workers.NotifyWorker,                 :default},
+    "git_commit"    => {:s3_archive,              Workers.S3ArchiveWorker,              :default},
+    "s3_archive"    => {:notify,                  Workers.NotifyWorker,                 :default},
     # Scholion quote publish flow (POST /publish/scholion)
     "scholion_queued"     => {:scholion_synthesize, Workers.ScholionSynthesizeWorker,   :default},
     "scholion_synthesize" => {:scholion_write,      Workers.ScholionWriteWorker,        :default},
