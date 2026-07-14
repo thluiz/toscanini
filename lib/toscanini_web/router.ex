@@ -23,6 +23,8 @@ defmodule ToscaniniWeb.Router do
     get  "/pipelines/find",           PipelineController, :find_by_url
     post "/pipelines/:id/prioritize", PipelineController, :prioritize
 
+    get    "/feeds/config",            FeedController, :get_config
+    put    "/feeds/config",            FeedController, :put_config
     post   "/subscriptions",           FeedController, :create
     get    "/subscriptions",           FeedController, :index
     get    "/subscriptions/:id",       FeedController, :show

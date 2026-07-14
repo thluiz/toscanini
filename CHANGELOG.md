@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.2.15] — 2026-07-14
+
+### Rede de segurança dos feeds vira âncora de relógio UTC, configurável em runtime
+
+Antes, o check diário fora da janela quente usava `idle_interval_min` (intervalo
+que derivava a partir do último check — sem hora fixa). Agora é uma **âncora de
+relógio UTC**: fora da janela quente, o feed é checado 1×/dia na hora UTC
+configurada (default **06:00 UTC** = 03:00 BRT — cedo pra já ter episódios
+processando de manhã). A hora é **editável em runtime, sem redeploy**, via arquivo
+`data/feeds_config.json` (espelha o padrão do scheduler) + endpoint HTTP.
+
+- **`lib/toscanini/feeds_config.ex`** — novo: lê/escreve `data/feeds_config.json`,
+  default `safety_hour_utc: 6`, valida 0–23.
+- **`lib/toscanini/feeds.ex`** — `due?/2` separa janela quente (hot_interval) da
+  rede de segurança (`safety_due?/2`: dispara só quando `now.hour ==
+  FeedsConfig.safety_hour_utc()` e ≥12h desde o último check). `idle_interval_min`
+  deixa de ser usado.
+- **`lib/toscanini_web/controllers/feed_controller.ex`** + rotas — `GET/PUT
+  /feeds/config` (`{safety_hour_utc: 0..23}`), muda ao vivo sem restart.
+
 ## [0.2.12] — 2026-07-14
 
 ### Assinaturas de feed: download automático de novos episódios (PocketCasts)
