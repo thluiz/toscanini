@@ -28,9 +28,15 @@ defmodule Toscanini.FeedsTest do
       assert Feeds.due?(s, @thu)
     end
 
-    test "dia quente: NÃO devido antes de hot_interval_min" do
+    test "dia quente: NÃO devido antes de hot_interval_min - folga" do
       s = sub(check_days: ~s(["thu"]), hot_interval_min: 60, last_checked_at: DateTime.add(@thu, -30, :minute))
       refute Feeds.due?(s, @thu)
+    end
+
+    test "dia quente: devido com folga (55min, hot_interval 60, grace default 10 → limiar 50)" do
+      # Sem a folga, 55 < 60 pularia o sweep (o bug do 'every 2h'); com folga 10, 55 >= 50 → devido.
+      s = sub(check_days: ~s(["thu"]), hot_interval_min: 60, last_checked_at: DateTime.add(@thu, -55, :minute))
+      assert Feeds.due?(s, @thu)
     end
 
     test "check_days vazio → janela quente sempre ligada (usa hot_interval mesmo fora da hora-âncora)" do

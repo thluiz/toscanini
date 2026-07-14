@@ -110,7 +110,9 @@ defmodule Toscanini.Feeds do
 
   @doc """
   Decide se a assinatura deve ser checada agora. Dentro da janela quente
-  (dia ∈ check_days, ou check_days vazio) usa `hot_interval_min` (poll horário).
+  (dia ∈ check_days, ou check_days vazio) usa `hot_interval_min` menos
+  `FeedsConfig.hot_grace_min/0` de folga (senão o sweep horário era pulado por
+  segundos — ver [[FeedsConfig]]).
   Fora dela, roda uma **rede de segurança 1×/dia à hora UTC configurada**
   (`FeedsConfig.safety_hour_utc/0`, default 06:00 UTC — editável em runtime, sem
   redeploy) — âncora de relógio, não intervalo à deriva.
@@ -119,7 +121,7 @@ defmodule Toscanini.Feeds do
     if hot?(sub, now) do
       case sub.last_checked_at do
         nil  -> true
-        last -> DateTime.diff(now, last, :minute) >= sub.hot_interval_min
+        last -> DateTime.diff(now, last, :minute) >= sub.hot_interval_min - Toscanini.FeedsConfig.hot_grace_min()
       end
     else
       safety_due?(sub, now)
