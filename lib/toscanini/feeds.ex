@@ -33,9 +33,17 @@ defmodule Toscanini.Feeds do
   def get_subscription(id), do: Repo.get(FeedSubscription, id)
   def get_subscription!(id), do: Repo.get!(FeedSubscription, id)
 
+  # Update vindo do HTTP (input não-confiável): aplica a allowlist de campos que
+  # o utilizador pode alterar. Campos internos (watermark, etag) NÃO passam aqui.
   def update_subscription(%FeedSubscription{} = sub, attrs) do
+    do_update(sub, normalize_attrs(attrs))
+  end
+
+  # Update interno (confiável): grava watermark/etag/last_checked_at diretamente,
+  # sem a allowlist. O changeset ainda é o guarda (só casta @castable).
+  defp do_update(%FeedSubscription{} = sub, attrs) do
     sub
-    |> FeedSubscription.changeset(normalize_attrs(attrs))
+    |> FeedSubscription.changeset(encode_check_days(attrs))
     |> Repo.update()
   end
 
@@ -88,7 +96,7 @@ defmodule Toscanini.Feeds do
           %{last_published_at: now, last_checked_at: now}
       end
 
-    {:ok, primed} = update_subscription(sub, updates)
+    {:ok, primed} = do_update(sub, updates)
     primed
   end
 
@@ -149,7 +157,7 @@ defmodule Toscanini.Feeds do
         }
 
         if new == [] do
-          {:ok, _} = update_subscription(sub, base)
+          {:ok, _} = do_update(sub, base)
           {:ok, :no_change}
         else
           urls = Enum.map(new, fn {ep, _dt} -> Pocketcasts.episode_url(sub.feed_ref, ep["uuid"]) end)
@@ -158,7 +166,7 @@ defmodule Toscanini.Feeds do
           {latest_dt, latest_uuid} = latest_episode(Enum.map(new, fn {ep, _} -> ep end))
 
           {:ok, _} =
-            update_subscription(
+            do_update(
               sub,
               Map.merge(base, %{last_published_at: latest_dt, last_episode_uuid: latest_uuid})
             )
@@ -176,7 +184,7 @@ defmodule Toscanini.Feeds do
   def check(%FeedSubscription{source: source}), do: {:error, {:unsupported_source, source}}
 
   defp touch_checked(sub, now) do
-    {:ok, _} = update_subscription(sub, %{last_checked_at: now})
+    {:ok, _} = do_update(sub, %{last_checked_at: now})
     :ok
   end
 
