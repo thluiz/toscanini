@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.2.16] — 2026-07-14
+
+### Folga configurável na janela quente (corrige check a cada 2h)
+
+Bug: como cada check gravava `last_checked_at` alguns segundos após a hora cheia
+(ex.: 16:00:04), o sweep horário seguinte via `DateTime.diff(:minute)` = 59min <
+60 e **pulava** — resultando em check a cada 2h em vez de 1h nos dias quentes.
+
+Fix: o limiar da janela quente ganha uma folga configurável — devido quando
+`elapsed >= hot_interval_min - hot_grace_min`. `hot_grace_min` default 10,
+editável em runtime pelo mesmo `/feeds/config` (e `data/feeds_config.json`).
+
+- **`lib/toscanini/feeds_config.ex`** — novo campo `hot_grace_min` (default 10,
+  valida 0–59); `validate` generalizado p/ múltiplas chaves.
+- **`lib/toscanini/feeds.ex`** — `due?/2` subtrai a folga no limiar da janela quente.
+
 ## [0.2.15] — 2026-07-14
 
 ### Rede de segurança dos feeds vira âncora de relógio UTC, configurável em runtime
