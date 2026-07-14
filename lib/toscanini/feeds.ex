@@ -20,6 +20,10 @@ defmodule Toscanini.Feeds do
 
   @day_abbr {"mon", "tue", "wed", "thu", "fri", "sat", "sun"}
 
+  # Gap mínimo desde o último check para a rede de segurança disparar (evita
+  # duplo disparo na hora-âncora e respeita checks recentes de dia quente).
+  @safety_min_gap_hours 12
+
   # ---- CRUD -----------------------------------------------------------------
 
   def list_subscriptions do
@@ -106,15 +110,30 @@ defmodule Toscanini.Feeds do
 
   @doc """
   Decide se a assinatura deve ser checada agora. Dentro da janela quente
-  (dia ∈ check_days, ou check_days vazio) usa `hot_interval_min`; fora dela usa
-  `idle_interval_min` como rede de segurança.
+  (dia ∈ check_days, ou check_days vazio) usa `hot_interval_min` (poll horário).
+  Fora dela, roda uma **rede de segurança 1×/dia à hora UTC configurada**
+  (`FeedsConfig.safety_hour_utc/0`, default 06:00 UTC — editável em runtime, sem
+  redeploy) — âncora de relógio, não intervalo à deriva.
   """
   def due?(%FeedSubscription{} = sub, now \\ DateTime.utc_now()) do
-    interval = if hot?(sub, now), do: sub.hot_interval_min, else: sub.idle_interval_min
+    if hot?(sub, now) do
+      case sub.last_checked_at do
+        nil  -> true
+        last -> DateTime.diff(now, last, :minute) >= sub.hot_interval_min
+      end
+    else
+      safety_due?(sub, now)
+    end
+  end
 
-    case sub.last_checked_at do
-      nil -> true
-      last -> DateTime.diff(now, last, :minute) >= interval
+  # Rede de segurança: só dispara quando a hora UTC == safety_hour_utc e faz pelo
+  # menos ~meio dia desde o último check (evita disparo duplo e o caso de já ter
+  # sido checado num dia quente recente).
+  defp safety_due?(sub, now) do
+    cond do
+      now.hour != Toscanini.FeedsConfig.safety_hour_utc() -> false
+      is_nil(sub.last_checked_at)                         -> true
+      true -> DateTime.diff(now, sub.last_checked_at, :hour) >= @safety_min_gap_hours
     end
   end
 

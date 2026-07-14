@@ -1,8 +1,21 @@
 defmodule ToscaniniWeb.FeedController do
   use ToscaniniWeb, :controller
 
-  alias Toscanini.{Feeds, FeedSubscription}
+  alias Toscanini.{Feeds, FeedSubscription, FeedsConfig}
   alias Toscanini.Workers.FeedCheckWorker
+
+  # GET /feeds/config — config runtime dos feeds (ex.: hora-âncora da rede diária)
+  def get_config(conn, _params) do
+    json(conn, FeedsConfig.read())
+  end
+
+  # PUT /feeds/config — {safety_hour_utc: 0..23}. Muda ao vivo, sem restart.
+  def put_config(conn, params) do
+    case FeedsConfig.put(Map.drop(params, ["id"])) do
+      {:ok, cfg}       -> json(conn, cfg)
+      {:error, reason} -> conn |> put_status(422) |> json(%{error: reason})
+    end
+  end
 
   # POST /subscriptions  — {source?, feed_ref | url, title?, check_days?, ...}
   def create(conn, params) do
