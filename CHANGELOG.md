@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.2.17] — 2026-07-14
+
+### Arquivamento em cold storage (S3) — passo `s3_archive` no pipeline
+
+Novo passo entre `git_commit` e `notify` que arquiva o áudio/transcrição em cold
+storage assim que o episódio é publicado, pra depois liberar o disco do
+`collected` (que já passava de 160 GB). **Não apaga nada** — só arquiva; a limpeza
+local (retenção) vem em passo futuro, e nunca sem o objeto confirmado no S3.
+
+- **Podcast** (`metadata.source != "youtube"`): sobe o MP3 → `podcasts/<slug>.mp3`
+  (storage class Deep Archive por padrão).
+- **YouTube**: sobe só a transcrição → `youtube/<slug>.txt` (STANDARD); o áudio é
+  re-baixável do YouTube.
+
+Desligado por padrão (feature-flag): sem `TOSCANINI_ARCHIVE_ENABLED=true` + bucket,
+o passo é no-op (pass-through) — deploy inerte, zero impacto nos episódios atuais.
+
+- **`lib/toscanini/archive.ex`** — novo: cliente fino do `aws` CLI (`put/3`,
+  `object_exists?/1`, `enabled?/0`), config runtime sob `:archive`.
+- **`lib/toscanini/workers/s3_archive_worker.ex`** — novo: passo `s3_archive`,
+  detecta tipo por `metadata.source`, idempotente (`head-object`), no-op se off.
+- **`lib/toscanini/pipeline/dispatcher.ex`** — aresta `git_commit → s3_archive →
+  notify`.
+- **`config/runtime.exs`** — bloco `:archive` (envs `TOSCANINI_ARCHIVE_*`, todos
+  com default seguro; flag OFF).
+
 ## [0.2.16] — 2026-07-14
 
 ### Folga configurável na janela quente (corrige check a cada 2h)
