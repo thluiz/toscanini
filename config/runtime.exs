@@ -67,3 +67,8 @@ config :toscanini, :whisper_worker_path,
 
 config :toscanini, :whisper_ld_library_path,
   System.get_env("WHISPER_LD_LIBRARY_PATH", "")
+
+# Modelo da anotação automática (suggest + annotate) — override sem redeploy.
+if model = System.get_env("TOSCANINI_ANNOTATE_MODEL") do
+  config :toscanini, annotate_model: model
+end

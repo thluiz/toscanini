@@ -43,13 +43,18 @@ defmodule Toscanini.Workers.AnnotateWorker do
     json_data = json_path |> File.read!() |> Jason.decode!()
     transcript = json_data["transcript"]
 
+    model_opts = [
+      model: Application.get_env(:toscanini, :annotate_model),
+      fallback_models: Application.get_env(:toscanini, :annotate_fallback_models, [])
+    ]
+
     with true <- is_binary(transcript) and String.trim(transcript) != "",
          {:ok, %{"suggestions" => suggestions}} when suggestions != [] <-
-           VoxIntelligence.suggest_annotations(episode_of(json_data)),
+           VoxIntelligence.suggest_annotations(episode_of(json_data), model_opts),
          bookmarks = bookmarks_of(suggestions),
          true <- bookmarks != [],
          {:ok, annotated} when annotated != [] <-
-           VoxIntelligence.annotate(transcript, bookmarks) do
+           VoxIntelligence.annotate(transcript, bookmarks, model_opts) do
       existing = List.wrap(json_data["annotations"])
       built    = build_annotations(annotated, suggestions)
       merged   = merge_annotations(existing, built)

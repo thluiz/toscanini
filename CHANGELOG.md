@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.2.20] — 2026-07-15
+
+### Anotação automática passa a usar GPT (suggest + annotate)
+
+Os dois passes da anotação automática deixam de usar os modelos baratos default
+do preset (Gemini Flash no suggest, DeepSeek no annotate) e passam a usar **GPT**
+(`openrouter/openai/gpt-5.2`, fallback `gpt-5.1`). Motivo: cobertura/qualidade —
+o modelo barato perdia beats conceituais em podcasts discursivos (PT).
+
+- **`config/config.exs`** — `annotate_model` + `annotate_fallback_models` (default GPT).
+- **`config/runtime.exs`** — override sem redeploy via `TOSCANINI_ANNOTATE_MODEL`.
+- **`lib/toscanini/clients/vox_intelligence.ex`** — `suggest_annotations/2` e `annotate/3`
+  aceitam `model`/`fallback_models` (injetados no corpo do preset).
+- **`lib/toscanini/workers/annotate_worker.ex`** — passa o modelo configurado nos dois passes.
+
 ## [0.2.19] — 2026-07-14
 
 ### Anotação automática por feed — passo `annotate` no pipeline
