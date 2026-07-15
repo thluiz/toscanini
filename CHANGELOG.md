@@ -15,6 +15,20 @@ o modelo barato perdia beats conceituais em podcasts discursivos (PT).
   aceitam `model`/`fallback_models` (injetados no corpo do preset).
 - **`lib/toscanini/workers/annotate_worker.ex`** — passa o modelo configurado nos dois passes.
 
+### Retenção vira filesystem-driven (passa a cobrir o backlog)
+
+Correção da retenção introduzida em 0.2.18: a versão original consultava o banco
+de pipelines (`results.s3_archive.done`), mas os ~157 GB do backlog foram
+arquivados pelo script standalone — **sem** esse registro, e com `archived_at` =
+data do arquivamento — então **nunca seriam limpos**. Reescrita como
+**filesystem-driven**: varre `collected/*.json`, usa o `mtime` do áudio (data do
+download) como idade e apaga só com `head-object` confirmando o objeto no S3.
+Cobre uniformemente backlog **e** going-forward, sem depender do banco. Travas
+inalteradas (`enabled?` + `backlog_done` + `dry_run`).
+
+- **`lib/toscanini/workers/retention_sweep_worker.ex`** — lógica filesystem-driven
+  (`mtime` + `object_exists?`), sem `Repo`/`Pipeline`.
+
 ## [0.2.19] — 2026-07-14
 
 ### Anotação automática por feed — passo `annotate` no pipeline
