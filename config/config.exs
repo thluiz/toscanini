@@ -4,6 +4,13 @@ config :toscanini,
   ecto_repos: [Toscanini.Repo],
   generators: [timestamp_type: :utc_datetime]
 
+# Modelo dos dois passes da anotação automática (suggest + annotate). GPT dá
+# cobertura/qualidade melhor que o modelo barato default do preset. Override em
+# runtime via TOSCANINI_ANNOTATE_MODEL (ver config/runtime.exs).
+config :toscanini,
+  annotate_model: "openrouter/openai/gpt-5.2",
+  annotate_fallback_models: ["openrouter/openai/gpt-5.1"]
+
 config :toscanini, ToscaniniWeb.Endpoint,
   url: [host: "localhost"],
   adapter: Bandit.PhoenixAdapter,

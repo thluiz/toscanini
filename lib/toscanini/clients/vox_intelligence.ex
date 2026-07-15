@@ -36,10 +36,12 @@ defmodule Toscanini.Clients.VoxIntelligence do
   Retorna `{:ok, %{"suggestions" => [%{"ts" => ..., "tier" => ...,
   "title" => ..., "description" => ..., "quote" => ...}], "stats" => %{...}}}`.
   """
-  def suggest_annotations(episode) when is_map(episode) do
+  def suggest_annotations(episode, opts \\ []) when is_map(episode) do
+    body = put_model(%{"episode" => episode}, opts)
+
     case Req.post("#{base_url()}/api/vox-intelligence/presets/podcast/suggest-annotations",
-           json: %{"episode" => episode},
-           receive_timeout: 300_000) do
+           json: body,
+           receive_timeout: 600_000) do
       {:ok, %{status: 200, body: %{"x-parsed" => result}}} ->
         {:ok, result}
 
@@ -60,10 +62,12 @@ defmodule Toscanini.Clients.VoxIntelligence do
   opcional). Retorna `{:ok, [%{"time" => ..., "title" => ...,
   "description" => ...}]}` (o preset devolve uma lista direta em `x-parsed`).
   """
-  def annotate(transcript, bookmarks) when is_binary(transcript) and is_list(bookmarks) do
+  def annotate(transcript, bookmarks, opts \\ []) when is_binary(transcript) and is_list(bookmarks) do
+    body = put_model(%{"transcript" => transcript, "bookmarks" => bookmarks}, opts)
+
     case Req.post("#{base_url()}/api/vox-intelligence/presets/podcast/annotate",
-           json: %{"transcript" => transcript, "bookmarks" => bookmarks},
-           receive_timeout: 600_000) do
+           json: body,
+           receive_timeout: 900_000) do
       {:ok, %{status: 200, body: %{"x-parsed" => result}}} when is_list(result) ->
         {:ok, result}
 
@@ -74,6 +78,18 @@ defmodule Toscanini.Clients.VoxIntelligence do
         {:error, inspect(e)}
     end
   end
+
+  # Injeta model/fallbackModels no corpo quando fornecidos em opts (permite
+  # sobrescrever o modelo default do preset — ex.: GPT em vez do modelo barato).
+  defp put_model(body, opts) do
+    body
+    |> maybe_put("model", Keyword.get(opts, :model))
+    |> maybe_put("fallbackModels", Keyword.get(opts, :fallback_models))
+  end
+
+  defp maybe_put(map, _key, nil), do: map
+  defp maybe_put(map, _key, []), do: map
+  defp maybe_put(map, key, value), do: Map.put(map, key, value)
 
   @doc """
   Sintetiza uma nota de citação Scholion (add-scholion-quote) a partir de uma
