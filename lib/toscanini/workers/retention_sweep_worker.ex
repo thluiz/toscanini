@@ -1,7 +1,13 @@
 defmodule Toscanini.Workers.RetentionSweepWorker do
   @moduledoc """
   Varredura diária de retenção: apaga o áudio LOCAL de episódios já arquivados no
-  cold storage há mais de `retention_days`, liberando disco no `collected`.
+  cold storage, liberando disco no `collected`.
+
+  **Filesystem-driven** (não depende do banco de pipelines): varre
+  `collected/*.json`, usa o `mtime` do áudio como idade (data do download) e apaga
+  só com o objeto confirmado no S3. Cobre uniformemente tanto o backlog (arquivado
+  pelo script standalone, sem registro no pipeline) quanto os episódios
+  going-forward (arquivados pelo passo `s3_archive`).
 
   Disparado pelo `Oban.Plugins.Cron`. Auto-gated e conservador:
 
@@ -9,17 +15,18 @@ defmodule Toscanini.Workers.RetentionSweepWorker do
   2. No-op se `TOSCANINI_ARCHIVE_BACKLOG_DONE != true` — trava operacional: nunca
      limpa antes de todo o histórico estar confirmado no cold (invariante do plano).
   3. Em `dry_run` (default `true`), só loga os candidatos — não apaga.
-  4. **Nunca apaga sem confirmar o par no S3** (`Archive.object_exists?/1`).
-
-  Candidato = pipeline `done` com `results.s3_archive.done = true` e `archived_at`
-  mais velho que `retention_days`. Apaga o áudio local (`collect.mp3`/`collect.audio`);
-  a transcrição do youtube e o mp3 do podcast já estão no cold.
+  4. **Nunca apaga sem confirmar o par no S3** (`Archive.object_exists?/1`):
+     - podcast → `podcasts/<slug>.mp3` (o próprio mp3 no cold)
+     - youtube → `youtube/<slug>.txt` (transcrição; o áudio local é re-baixável)
   """
   use Oban.Worker, queue: :default, max_attempts: 1
 
   require Logger
-  alias Toscanini.{Repo, Pipeline, Archive}
+  alias Toscanini.Archive
   alias Toscanini.Clients.GossipGate
+
+  # Extensões de áudio possíveis (youtube via yt-dlp gera webm/m4a/opus/...).
+  @audio_exts ~w[mp3 webm m4a opus mp4 ogg wav]
 
   @impl Oban.Worker
   def perform(%Oban.Job{}) do
@@ -31,7 +38,7 @@ defmodule Toscanini.Workers.RetentionSweepWorker do
         :ok
 
       cfg[:backlog_done] != true ->
-        Logger.info("[Retention] skip — backlog ainda não confirmado (TOSCANINI_ARCHIVE_BACKLOG_DONE)")
+        Logger.info("[Retention] skip — backlog não confirmado (TOSCANINI_ARCHIVE_BACKLOG_DONE)")
         :ok
 
       true ->
@@ -42,76 +49,89 @@ defmodule Toscanini.Workers.RetentionSweepWorker do
   defp sweep(cfg) do
     days   = cfg[:retention_days] || 30
     dry    = cfg[:dry_run] != false
-    cutoff = DateTime.utc_now() |> DateTime.add(-days * 86_400, :second) |> DateTime.to_iso8601()
+    dir    = Application.get_env(:toscanini, :collected_dir, "/home/hermes/collected")
+    cutoff = System.os_time(:second) - days * 86_400
 
-    Logger.info("[Retention] início (retention_days=#{days}, dry_run=#{dry}, cutoff=#{cutoff})")
+    Logger.info("[Retention] início (dir=#{dir}, retention_days=#{days}, dry_run=#{dry})")
 
-    candidates = fetch_candidates(cutoff)
-    {deleted, freed, kept} = Enum.reduce(candidates, {0, 0, 0}, &process(&1, &2, dry))
+    {del, freed, kept, expired} =
+      Path.wildcard(Path.join(dir, "*.json"))
+      |> Enum.reduce({0, 0, 0, 0}, fn jf, acc -> process(jf, dir, cutoff, dry, acc) end)
 
     msg =
-      "[Retention] fim — #{if dry, do: "DRY-RUN ", else: ""}candidatos=#{length(candidates)} " <>
-        "apagados=#{deleted} liberado=#{Float.round(freed / 1_073_741_824, 2)}GB não-confirmados=#{kept}"
+      "[Retention] fim — #{if dry, do: "DRY-RUN ", else: ""}vencidos=#{expired} " <>
+        "apagados=#{del} liberado=#{gb(freed)}GB não-confirmados=#{kept}"
 
     Logger.info(msg)
-    if not dry and deleted > 0, do: GossipGate.send("🧹 " <> msg)
+    if not dry and del > 0, do: GossipGate.send("🧹 " <> msg)
     :ok
   end
 
-  # {id, results_json} de pipelines done, arquivados e vencidos.
-  defp fetch_candidates(cutoff) do
-    sql = """
-    SELECT id, results FROM pipelines
-    WHERE status = 'done'
-      AND json_valid(results)
-      AND json_extract(results, '$.s3_archive.done') = 1
-      AND json_extract(results, '$.s3_archive.archived_at') <= ?
-    """
+  defp process(jf, dir, cutoff, dry, {del, freed, kept, expired}) do
+    slug = Path.basename(jf, ".json")
 
-    case Repo.query(sql, [cutoff]) do
-      {:ok, %{rows: rows}} -> rows
-      _ -> []
-    end
-  end
-
-  defp process([id, results_json], {del, freed, kept}, dry) do
-    results = Jason.decode!(results_json)
-    collect = results["collect"] || %{}
-    arch    = results["s3_archive"] || %{}
-
-    audio = collect["mp3"] || collect["audio"]
-    key   = arch["s3_key"]
+    {audio, key} =
+      case read_source(jf) do
+        "youtube" -> {find_audio(dir, slug), "youtube/#{slug}.txt"}
+        _         -> {Path.join(dir, "#{slug}.mp3"), "podcasts/#{slug}.mp3"}
+      end
 
     cond do
       is_nil(audio) or not File.exists?(audio) ->
-        # Já limpo (sweep anterior) ou nunca teve local — nada a fazer.
-        {del, freed, kept}
+        # Já limpo ou nunca teve áudio local.
+        {del, freed, kept, expired}
 
-      is_nil(key) or not Archive.object_exists?(key) ->
-        Logger.warning("[Retention] #{id}: mantém local — objeto S3 não confirmado (#{key})")
-        {del, freed, kept + 1}
+      mtime(audio) > cutoff ->
+        # Ainda dentro da janela local de retenção.
+        {del, freed, kept, expired}
+
+      not Archive.object_exists?(key) ->
+        Logger.warning("[Retention] mantém #{Path.basename(audio)} — objeto S3 não confirmado (#{key})")
+        {del, freed, kept + 1, expired + 1}
 
       dry ->
-        size = file_size(audio)
-        Logger.info("[Retention] #{id}: WOULD delete #{audio} (#{mb(size)}MB), s3=#{key}")
-        {del, freed, kept}
+        Logger.info("[Retention] WOULD delete #{audio} (#{mb(fsize(audio))}MB), s3=#{key}")
+        {del, freed, kept, expired + 1}
 
       true ->
-        size = file_size(audio)
+        size = fsize(audio)
 
         case File.rm(audio) do
           :ok ->
-            Logger.info("[Retention] #{id}: apagou #{audio} (#{mb(size)}MB), s3=#{key}")
-            {del + 1, freed + size, kept}
+            Logger.info("[Retention] apagou #{audio} (#{mb(size)}MB), s3=#{key}")
+            {del + 1, freed + size, kept, expired + 1}
 
           {:error, reason} ->
-            Logger.error("[Retention] #{id}: falha ao apagar #{audio}: #{inspect(reason)}")
-            {del, freed, kept}
+            Logger.error("[Retention] falha ao apagar #{audio}: #{inspect(reason)}")
+            {del, freed, kept, expired + 1}
         end
     end
   end
 
-  defp file_size(path) do
+  defp read_source(jf) do
+    with {:ok, body} <- File.read(jf),
+         {:ok, data} <- Jason.decode(body) do
+      get_in(data, ["metadata", "source"])
+    else
+      _ -> nil
+    end
+  end
+
+  defp find_audio(dir, slug) do
+    Enum.find_value(@audio_exts, fn ext ->
+      p = Path.join(dir, "#{slug}.#{ext}")
+      if File.exists?(p), do: p
+    end)
+  end
+
+  defp mtime(path) do
+    case File.stat(path, time: :posix) do
+      {:ok, %{mtime: m}} -> m
+      _ -> :infinity
+    end
+  end
+
+  defp fsize(path) do
     case File.stat(path) do
       {:ok, %{size: s}} -> s
       _ -> 0
@@ -119,4 +139,5 @@ defmodule Toscanini.Workers.RetentionSweepWorker do
   end
 
   defp mb(bytes), do: div(bytes, 1_048_576)
+  defp gb(bytes), do: Float.round(bytes / 1_073_741_824, 2)
 end
