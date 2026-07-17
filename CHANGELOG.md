@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.2.22] — 2026-07-17
+
+### Assinatura infere a janela quente (check_days) da cadência do feed
+
+Ao assinar um podcast **sem** `check_days` explícito, o Toscanini passa a derivar
+os dias da janela quente da própria cadência de publicação — em vez de deixar o
+hot sempre ligado (poll horário todo dia). O `prime_watermark` já busca o feed
+inteiro para gravar o watermark, então o histograma sai de graça no mesmo fetch.
+Objetivo: clientes burros (ex.: script do ClaudinhoSandbox) mandam só a URL e o
+agendamento certo é responsabilidade do servidor.
+
+- **`lib/toscanini/feeds.ex`** — `subscribe/1` marca `infer_schedule?` quando
+  `check_days` não vem nos attrs; `prime_watermark/2` chama `infer_check_days/2`
+  e grava os dias no mesmo update do watermark. `check_days` explícito (mesmo `[]`)
+  é respeitado — `[]` continua significando hot sempre ligado.
+- **`infer_check_days/2`** (função pura) — histograma de dia-da-semana (UTC) dos
+  até 12 episódios mais recentes; menor conjunto de dias no topo cobrindo ≥80% da
+  amostra (máx. 3), + vizinho ±1 dia com ≥25% (drift de meia-noite/fuso). Amostra
+  < 4 ou espalhada por ≥5 dias → `[]`. Episódios já vêm em UTC, mesmo referencial
+  de `hot?/2`/`due?/2`.
+- **`test/toscanini/feeds_test.exs`** — cobre semanal, amostra pequena, diário,
+  drift seg/ter e `published` inválido.
+
 ## [0.2.21] — 2026-07-17
 
 ### Feed com 1 episódio novo → job avulso (sem batch)
