@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.2.21] — 2026-07-17
+
+### Feed com 1 episódio novo → job avulso (sem batch)
+
+Corta a notificação redundante de "✅ Batch concluído — 1/1 episódios publicados"
+que vinha empilhada sobre a notificação do próprio episódio. Em regime estável
+cada feed solta 1 episódio por check, então quase todo batch automático era de
+tamanho 1 e o resumo não agregava nada além do que a notificação do episódio já
+dizia. Mudança escopada só no produtor de feeds — a máquina de batch (partilhada
+com a submissão manual do `BatchController`) fica intacta.
+
+- **`lib/toscanini/feeds.ex`** — `check/1`: 1 episódio novo → `submit_single/3`
+  (cria o `Pipeline` "queued" e chama `Dispatcher.advance`, mesmo caminho do
+  `JobController`); ≥2 episódios (backlog inicial / catch-up da rede de segurança)
+  → `Batches.start_batch` como antes, que serializa o processamento e manda o
+  resumo agregado. Falhas de episódio único continuam notificadas pelo
+  `ObanNotifier` global (independente de batch).
+
 ## [0.2.20] — 2026-07-15
 
 ### Anotação automática passa a usar GPT (suggest + annotate)
