@@ -15,7 +15,8 @@ defmodule Toscanini.Feeds do
   import Ecto.Query
   require Logger
 
-  alias Toscanini.{Repo, FeedSubscription, Batches}
+  alias Toscanini.{Repo, FeedSubscription, Batches, Pipeline}
+  alias Toscanini.Pipeline.Dispatcher
   alias Toscanini.Collectors.Pocketcasts
 
   @day_abbr {"mon", "tue", "wed", "thu", "fri", "sat", "sun"}
@@ -182,11 +183,24 @@ defmodule Toscanini.Feeds do
           {:ok, :no_change}
         else
           urls = Enum.map(new, fn {ep, _dt} -> Pocketcasts.episode_url(sub.feed_ref, ep["uuid"]) end)
-          # Propaga a flag do feed para os params do pipeline (via extra_params do
-          # batch, herdada por todos os itens em BatchAdvanceWorker). O
-          # AnnotateWorker lê "auto_annotate" e faz no-op se falso.
-          {:ok, batch, _pid} =
-            Batches.start_batch(urls, "pocketcasts", %{"auto_annotate" => sub.auto_annotate})
+          # Propaga a flag do feed para os params do pipeline. O AnnotateWorker lê
+          # "auto_annotate" e faz no-op se falso.
+          extra = %{"auto_annotate" => sub.auto_annotate}
+
+          # Um episódio só (caso comum em regime estável) → job avulso, sem batch:
+          # evita a notificação redundante de "batch concluído 1/1" empilhada sobre
+          # a notificação do próprio episódio. Vários de uma vez (backlog inicial ou
+          # catch-up da rede de segurança) → batch, que serializa o processamento e
+          # manda um resumo agregado (via extra_params herdados no BatchAdvanceWorker).
+          ref =
+            case urls do
+              [single] ->
+                "job #{submit_single(single, "pocketcasts", extra)}"
+
+              _ ->
+                {:ok, batch, _pid} = Batches.start_batch(urls, "pocketcasts", extra)
+                "batch #{batch.id}"
+            end
 
           {latest_dt, latest_uuid} = latest_episode(Enum.map(new, fn {ep, _} -> ep end))
 
@@ -196,7 +210,7 @@ defmodule Toscanini.Feeds do
               Map.merge(base, %{last_published_at: latest_dt, last_episode_uuid: latest_uuid})
             )
 
-          Logger.info("[Feeds] #{sub.feed_ref}: #{length(new)} episódio(s) novo(s) → batch #{batch.id}")
+          Logger.info("[Feeds] #{sub.feed_ref}: #{length(new)} episódio(s) novo(s) → #{ref}")
           {:ok, {:submitted, length(new)}}
         end
 
@@ -207,6 +221,26 @@ defmodule Toscanini.Feeds do
   end
 
   def check(%FeedSubscription{source: source}), do: {:error, {:unsupported_source, source}}
+
+  # Submete um episódio avulso ao pipeline (sem batch). Mesmo caminho do
+  # JobController: cria o Pipeline "queued" com os params e dispara o dispatcher.
+  # Sem batch_id nos params, o NotifyWorker notifica só o episódio e não avança
+  # nenhum batch nem manda resumo (ver NotifyWorker.notify_podcast).
+  defp submit_single(url, collector, extra_params) do
+    pipeline_id = Ecto.UUID.generate()
+    params = Map.put(extra_params, "url", url)
+
+    Repo.insert!(%Pipeline{
+      id:           pipeline_id,
+      content_type: "podcast",
+      collector:    collector,
+      status:       "queued",
+      params:       Jason.encode!(params)
+    })
+
+    Dispatcher.advance(pipeline_id)
+    pipeline_id
+  end
 
   defp touch_checked(sub, now) do
     {:ok, _} = do_update(sub, %{last_checked_at: now})
