@@ -63,6 +63,9 @@ defmodule Toscanini.Feeds do
   """
   def subscribe(attrs) do
     attrs = normalize_attrs(attrs)
+    # Sem check_days explícito → inferir a janela quente da cadência do feed no
+    # priming (ver infer_check_days/2). check_days presente (mesmo []) é respeitado.
+    infer_schedule? = not Map.has_key?(attrs, :check_days)
 
     with {:ok, feed_ref} <- resolve_feed_ref(attrs) do
       attrs = Map.put(attrs, :feed_ref, feed_ref)
@@ -71,7 +74,7 @@ defmodule Toscanini.Feeds do
       |> FeedSubscription.changeset(attrs)
       |> Repo.insert()
       |> case do
-        {:ok, sub}      -> {:ok, prime_watermark(sub)}
+        {:ok, sub}      -> {:ok, prime_watermark(sub, infer_schedule?)}
         {:error, _} = e -> e
       end
     end
@@ -79,7 +82,7 @@ defmodule Toscanini.Feeds do
 
   # Grava o watermark inicial = data do episódio mais recente atual (ou "agora"
   # se o feed falhar/vier vazio), garantindo que só o PRÓXIMO episódio entra.
-  defp prime_watermark(%FeedSubscription{source: "pocketcasts"} = sub) do
+  defp prime_watermark(%FeedSubscription{source: "pocketcasts"} = sub, infer_schedule?) do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
 
     updates =
@@ -87,7 +90,7 @@ defmodule Toscanini.Feeds do
         {:ok, %{episodes: episodes} = feed} ->
           {latest_dt, latest_uuid} = latest_episode(episodes)
 
-          %{
+          base = %{
             last_published_at: latest_dt || now,
             last_episode_uuid: latest_uuid,
             etag:              feed[:etag],
@@ -95,6 +98,13 @@ defmodule Toscanini.Feeds do
             last_checked_at:   now,
             title:             sub.title || get_in(feed, [:podcast_info, :title])
           }
+
+          # Janela quente automática: sem check_days explícito, deriva os dias
+          # dominantes de publicação. Os episódios já vêm em UTC — mesmo
+          # referencial de hot?/2 e due?/2. do_update serializa a lista→JSON.
+          if infer_schedule?,
+            do: Map.put(base, :check_days, infer_check_days(episodes)),
+            else: base
 
         other ->
           Logger.warning("[Feeds] fetch inicial falhou p/ #{sub.feed_ref}: #{inspect(other)}")
@@ -105,7 +115,74 @@ defmodule Toscanini.Feeds do
     primed
   end
 
-  defp prime_watermark(sub), do: sub
+  defp prime_watermark(sub, _infer_schedule?), do: sub
+
+  # ---- Inferência da janela quente ------------------------------------------
+
+  @doc """
+  Deriva os `check_days` (janela quente) da cadência de publicação do feed.
+
+  Olha os até `sample` episódios mais recentes, monta o histograma de dia-da-
+  semana (UTC) e devolve o menor conjunto de dias no topo que cobre ≥ 80% da
+  amostra (no máx. 3 dias), incluindo um vizinho ±1 dia com ≥ 25% da amostra
+  (drift de meia-noite / fuso). Amostra pequena (< 4) ou espalhada por ≥ 5 dias
+  distintos → `[]` (hot sempre ligado). Devolve abreviações em ordem natural da
+  semana. Função pura: recebe a lista de episódios já buscada no priming.
+  """
+  def infer_check_days(episodes, sample \\ 12) do
+    dated =
+      episodes
+      |> Enum.map(fn ep -> parse_published(ep["published"]) end)
+      |> Enum.reject(&is_nil/1)
+      |> Enum.sort({:desc, DateTime})
+      |> Enum.take(sample)
+
+    n = length(dated)
+    hist = Enum.frequencies(Enum.map(dated, &day_abbr/1))
+
+    cond do
+      n < 4 -> []
+      map_size(hist) >= 5 -> []
+      true -> dominant_days(hist, n)
+    end
+  end
+
+  # Menor conjunto de dias no topo cobrindo ≥ 80% (cap 3) + vizinhos de drift.
+  defp dominant_days(hist, n) do
+    ordered = Enum.sort_by(hist, fn {_d, c} -> -c end)
+    target = ceil(n * 0.8)
+
+    {pick, _} =
+      Enum.reduce_while(ordered, {[], 0}, fn {d, c}, {acc, cum} ->
+        if length(acc) >= 3 and cum >= target do
+          {:halt, {acc, cum}}
+        else
+          acc2 = acc ++ [d]
+          cum2 = cum + c
+          if cum2 >= target, do: {:halt, {acc2, cum2}}, else: {:cont, {acc2, cum2}}
+        end
+      end)
+
+    thr = ceil(n * 0.25)
+
+    pick
+    |> Enum.reduce(pick, fn d, acc ->
+      Enum.reduce([-1, 1], acc, fn off, acc2 ->
+        nb = neighbor_day(d, off)
+        if Map.get(hist, nb, 0) >= thr and nb not in acc2, do: acc2 ++ [nb], else: acc2
+      end)
+    end)
+    |> Enum.sort_by(&day_index/1)
+  end
+
+  defp day_abbr(%DateTime{} = dt) do
+    idx = dt |> DateTime.to_date() |> Date.day_of_week()
+    elem(@day_abbr, idx - 1)
+  end
+
+  defp day_index(abbr), do: Enum.find_index(Tuple.to_list(@day_abbr), &(&1 == abbr))
+
+  defp neighbor_day(abbr, off), do: elem(@day_abbr, Integer.mod(day_index(abbr) + off, 7))
 
   # ---- Cadência -------------------------------------------------------------
 

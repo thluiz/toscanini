@@ -103,6 +103,48 @@ defmodule Toscanini.FeedsTest do
     end
   end
 
+  describe "infer_check_days/2 — janela quente pela cadência" do
+    # Helper: gera N episódios semanais recuando a partir de uma âncora, num dado
+    # dia-da-semana, com deslocamento opcional (para simular drift de meia-noite).
+    defp weekly(anchor, n, step_days \\ 7) do
+      for i <- 0..(n - 1) do
+        %{"uuid" => "e#{i}", "published" => DateTime.add(anchor, -i * step_days, :day) |> DateTime.to_iso8601()}
+      end
+    end
+
+    test "semanal numa terça → [\"tue\"]" do
+      # 2026-07-14 é terça-feira.
+      eps = weekly(~U[2026-07-14 09:00:00Z], 10)
+      assert Feeds.infer_check_days(eps) == ["tue"]
+    end
+
+    test "amostra pequena (< 4) → [] (hot sempre ligado)" do
+      eps = weekly(~U[2026-07-14 09:00:00Z], 3)
+      assert Feeds.infer_check_days(eps) == []
+    end
+
+    test "diário (≥ 5 dias distintos) → [] (hot sempre ligado)" do
+      eps = weekly(~U[2026-07-14 09:00:00Z], 12, 1)
+      assert Feeds.infer_check_days(eps) == []
+    end
+
+    test "drift de meia-noite: mistura seg/ter puxa o vizinho" do
+      # 6 terças + 6 segundas → dois dias dominantes adjacentes.
+      ter = weekly(~U[2026-07-14 09:00:00Z], 6)
+      seg = weekly(~U[2026-07-13 23:30:00Z], 6)
+      assert Feeds.infer_check_days(ter ++ seg) == ["mon", "tue"]
+    end
+
+    test "ignora published inválido/ausente e ordena na semana" do
+      eps =
+        weekly(~U[2026-07-16 09:00:00Z], 8) ++
+          [%{"uuid" => "bad", "published" => "xx"}, %{"uuid" => "nil", "published" => nil}]
+
+      # 2026-07-16 é quinta.
+      assert Feeds.infer_check_days(eps) == ["thu"]
+    end
+  end
+
   describe "latest_episode/1" do
     test "devolve a data máxima e o uuid do mais recente" do
       eps = [
