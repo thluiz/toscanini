@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.2.23] — 2026-08-20
+
+### Notificações vão para o chat próprio do Toscanini (GossipGate `target`)
+
+O GossipGate ganhou um registry de destinos nomeados (`destinations.json` →
+`chat_id`). O Toscanini passa a mandar tudo com `target: "toscanini"`, tirando o
+ruído de processamento do chat geral. Roteamento fica no cliente HTTP, não
+espalhado pelos workers — todos os pontos de notificação herdam de graça:
+`NotifyWorker` (episódio + citação Scholion), `BatchAdvanceWorker` (resumo de
+batch), `RetentionSweepWorker` (varredura) e `ObanNotifier` (falha de pipeline).
+
+- **`lib/toscanini/clients/gossip_gate.ex`** — `send/3` inclui `"target"` no
+  corpo do POST; terceiro argumento opcional permite override por chamada, `nil`
+  cai no destino default. HTTP não-200 agora reporta o target no erro.
+- **`config/runtime.exs`** — `:gossipgate_target`, de `GOSSIPGATE_TARGET`,
+  default `"toscanini"`. Para voltar ao chat geral: `GOSSIPGATE_TARGET=default`.
+
 ## [0.2.22] — 2026-07-17
 
 ### Assinatura infere a janela quente (check_days) da cadência do feed
