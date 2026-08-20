@@ -17,6 +17,11 @@ config :toscanini, :collected_dir,
 config :toscanini, :gossipgate_api_key,
   System.get_env("GOSSIPGATE_API_KEY", "")
 
+# Destino nomeado no GossipGate (registry destinations.json → chat_id). O
+# Toscanini fala no seu próprio chat, não no geral. "default" volta ao geral.
+config :toscanini, :gossipgate_target,
+  System.get_env("GOSSIPGATE_TARGET", "toscanini")
+
 # URL base dos serviços internos (via nginx). Nunca exposta em código.
 # Para apontar para outro host: setar HERMES_BASE_URL no service file.
 config :toscanini, :base_url,
