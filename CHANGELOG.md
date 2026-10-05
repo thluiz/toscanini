@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.2.24] — 2026-10-05
+
+### Grafia canônica de participantes no `enrich_tags`
+
+O summarize transcreve nomes de ouvido, então a mesma pessoa chegava ao Vox com
+grafias diferentes ("Thomas Trauman" / "Thomas Traumann", 17 variantes de
+"Jonathan Cutrell") — e cada grafia virava uma tag/página própria. A tabela
+revisada à mão vive no vox-content (`_meta/participants-aliases.csv`, colunas
+`variant,canonical`, excluída do build do Hugo) e o `EnrichTagsWorker` aplica
+antes de derivar as tags de participante. Cobre o pipeline normal e o
+`POST /publish/podcast` (que começa em `enrich_tags`).
+
+- **`lib/toscanini/participant_aliases.ex`** (novo) — `load/1` (arquivo ausente
+  → no-op), `normalize/2` (troca `participants` e o slug correspondente em
+  `tags`, sem duplicar; retorna a lista de trocas) e `slug/1` (regra das tags,
+  movida do worker).
+- **`lib/toscanini/workers/enrich_tags_worker.ex`** — normaliza antes de gerar as
+  tags; `save_result` ganha `"renamed"`. Tabela relida a cada episódio: edição no
+  vox-content vale sem restart, a partir do pull feito no `git_commit` seguinte.
+- **`test/toscanini/participant_aliases_test.exs`** (novo).
+
 ## [0.2.23] — 2026-08-20
 
 ### Notificações vão para o chat próprio do Toscanini (GossipGate `target`)
