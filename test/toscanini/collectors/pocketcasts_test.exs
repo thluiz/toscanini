@@ -26,4 +26,10 @@ defmodule Toscanini.Collectors.PocketcastsTest do
       assert {:ok, @podcast} == Pocketcasts.podcast_uuid_from_url(url)
     end
   end
+
+  describe "share_url/1" do
+    test "link público pca.st só com o episode_uuid" do
+      assert Pocketcasts.share_url(@episode) == "https://pca.st/episode/#{@episode}"
+    end
+  end
 end

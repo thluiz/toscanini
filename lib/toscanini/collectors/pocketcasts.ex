@@ -69,6 +69,16 @@ defmodule Toscanini.Collectors.Pocketcasts do
     "https://pocketcasts.com/podcast/#{podcast_uuid}/episode/#{episode_uuid}"
   end
 
+  @doc """
+  Link público do episódio, gravado em `metadata.source_url`. A URL de
+  `episode_url/2` não abre no site (a página canônica exige os slugs do podcast
+  e do episódio, que mudam quando o título muda); o share link `pca.st/episode`
+  só precisa do episode_uuid e redireciona para a página canônica atual.
+  """
+  def share_url(episode_uuid) do
+    "https://pca.st/episode/#{episode_uuid}"
+  end
+
   # 1. Seguir redirect para URL canónica com UUIDs (sem descarregar o body da página)
   defp fetch_metadata(url) do
     # Tenta extrair UUIDs da URL original antes de seguir redirects.
@@ -275,7 +285,7 @@ defmodule Toscanini.Collectors.Pocketcasts do
       published:        published,
       duration_secs:    dur_secs,
       slug:             slug,
-      source_url:       source_url
+      source_url:       if(ep["uuid"], do: share_url(ep["uuid"]), else: source_url)
     }
 
     if audio_url, do: {:ok, meta}, else: {:error, "episódio sem URL de áudio"}
