@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.2.25] — 2026-10-13
+
+### `metadata.source_url` do PocketCasts vira link que abre
+
+O collector gravava em `metadata.source_url` a URL de entrada do pipeline
+(`pocketcasts.com/podcast/<p>/episode/<e>`, ou a da API `podcast-api.../full/...`),
+que não abre no site: a página canônica exige os slugs do podcast e do episódio,
+e o slug do episódio muda quando o título muda. O rodapé do Vox imprime
+`source_url` como está, então o link "PocketCasts —" de ~2200 episódios dava erro.
+
+- **`lib/toscanini/collectors/pocketcasts.ex`** — `share_url/1` monta
+  `https://pca.st/episode/<episode_uuid>` (share link oficial, redireciona para a
+  página canônica atual); `build_meta` grava isso em `source_url` quando a API
+  devolve o `uuid` do episódio. `episode_url/2` continua sendo o formato de
+  entrada do pipeline (feeds), não o link público.
+- **vox-content** — backfill dos 2179 JSONs com URL quebrada (commit `368a1735`).
+  URLs canônicas com slug e as do YouTube ficaram como estavam.
+
 ## [0.2.24] — 2026-10-05
 
 ### Grafia canônica de participantes no `enrich_tags`
