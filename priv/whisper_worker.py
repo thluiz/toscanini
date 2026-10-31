@@ -277,25 +277,31 @@ def detect_language(model, audio_path, duration):
     return None
 
 
-def transcribe(model, audio_path, output_path, progress_path, model_name, duration):
-    """Run transcription and write output. Returns (success, seg_count, error_msg)."""
-    detected_lang = detect_language(model, audio_path, duration)
+LOOP_MIN_LINES = 10
+LOOP_MAX_TOP_SHARE = 0.5
 
-    duration_str = fmt_time(duration) if duration else "?"
+
+def looping(lines):
+    """Same criterion as Toscanini.TranscriptCheck: one line is >= 50% of all."""
+    if len(lines) < LOOP_MIN_LINES:
+        return False
+    texts = [l.split("] ", 1)[-1] for l in lines]
+    top = max(texts.count(t) for t in set(texts))
+    return top / len(texts) >= LOOP_MAX_TOP_SHARE
+
+
+def run_transcription(model, audio_path, lang, progress_path, model_name,
+                      duration, duration_str, start_time, **opts):
     write_progress(progress_path, "transcribing", "00:00:00", duration_str,
-                   0.0, 0, "00:00:00", "?", model_name)
+                   0.0, 0, fmt_time(time.time() - start_time), "?", model_name)
 
-    segments, info = model.transcribe(audio_path, language=detected_lang)
+    segments, _info = model.transcribe(audio_path, language=lang, **opts)
 
-    start_time = time.time()
-    seg_count = 0
     last_progress_time = 0
     lines = []
 
     for s in segments:
-        line = f"[{fmt_time(s.start)}] {s.text.strip()}"
-        lines.append(line)
-        seg_count += 1
+        lines.append(f"[{fmt_time(s.start)}] {s.text.strip()}")
 
         now = time.time()
         if now - last_progress_time >= 30:
@@ -303,9 +309,34 @@ def transcribe(model, audio_path, output_path, progress_path, model_name, durati
             pct = (s.end / duration * 100) if duration else 0
             eta_s = ((elapsed / s.end) * (duration - s.end)) if duration and s.end > 0 else 0
             write_progress(progress_path, "transcribing", fmt_time(s.end),
-                           duration_str, pct, seg_count, fmt_time(elapsed),
+                           duration_str, pct, len(lines), fmt_time(elapsed),
                            fmt_time(eta_s), model_name)
             last_progress_time = now
+
+    return lines
+
+
+def transcribe(model, audio_path, output_path, progress_path, model_name, duration):
+    """Run transcription and write output. Returns (success, seg_count, error_msg)."""
+    detected_lang = detect_language(model, audio_path, duration)
+
+    duration_str = fmt_time(duration) if duration else "?"
+    start_time = time.time()
+
+    lines = run_transcription(model, audio_path, detected_lang, progress_path,
+                              model_name, duration, duration_str, start_time)
+
+    if looping(lines):
+        # The first window (show jingle, or a hallucination over intro music)
+        # becomes the prompt for the next one and the model repeats it to the
+        # end. Without conditioning on previous text the loop breaks at once.
+        print(f"Loop detected ({len(lines)} segments), retrying with "
+              f"condition_on_previous_text=False", file=sys.stderr)
+        lines = run_transcription(model, audio_path, detected_lang, progress_path,
+                                  model_name, duration, duration_str, start_time,
+                                  condition_on_previous_text=False)
+
+    seg_count = len(lines)
 
     # Write output atomically
     with open(output_path, "w") as f:

@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.2.28] — 2026-10-31
+
+### Whisper refaz a transcrição sem contexto quando sai em loop
+
+Reprocessados com a 0.2.26, três episódios voltaram em loop mesmo com idioma
+certo (prob=1.00): os dois do "Le principe de l'inquiétude" (áudio em francês) e
+o RapaduraCast 919. Não é áudio nem decode (PyAV e ffmpeg entregam o mesmo sinal):
+a 1ª janela de 30s pega a vinheta ("RAPADURACAST, O PODCAST DO PORTAL…") ou
+alucina sobre a música de abertura ("Sous-titres par Jérémy Diaz"), e com
+`condition_on_previous_text=True` (default) esse texto vira o prompt da janela
+seguinte até o fim. Testado nos 5 primeiros minutos: default 10 segmentos iguais;
+sem o condicionamento, 121 e 60 segmentos distintos, loop quebrado já aos 30s.
+
+- **`priv/whisper_worker.py`** — transcreve como antes; se o resultado está em loop
+  (mesmo critério do `TranscriptCheck`: uma linha ≥ 50% das linhas), refaz com
+  `condition_on_previous_text=False`. Só os casos quebrados pagam a segunda
+  passada; o guard do `TranscribeWorker` segue como última barreira.
+
 ## [0.2.27] — 2026-10-31
 
 Alterações que estavam rodando em produção direto no clone de serviço
