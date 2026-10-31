@@ -4,7 +4,8 @@ defmodule Toscanini.Workers.AnnotateWorker do
   fluxo das skills `suggest-annotations` → `podcast-annotate`, mas sem os gates
   humanos (roda direto no pipeline):
 
-    1. `suggest_annotations` (modelo barato) → 8–20 sugestões com timestamps
+    1. `suggest_annotations` (modelo barato) → tantas sugestões quanto o
+       episódio genuinamente render, com timestamps
     2. `annotate` os timestamps → anotações ricas (título + descrição)
     3. mescla no campo **`annotations`** do JSON (dedup por janela de 30s vs.
        existentes, ordena por ts) — **nunca toca no `timeline`**
@@ -13,6 +14,11 @@ defmodule Toscanini.Workers.AnnotateWorker do
   no-op e apenas avança. É **não-bloqueante**: qualquer falha na vox-intelligence
   é logada e o pipeline segue publicando sem anotações (podem ser adicionadas
   depois pelas skills). Ver [[FeedSubscription]], [[Dispatcher]].
+
+  As anotações efetivamente novas (pós-dedup) ficam salvas no resultado do
+  passo (`"new"`), com `tier` anexado só para uso do `NotifyWorker` — esse
+  campo não é escrito no JSON publicado, que mantém o schema de sempre
+  (ts/title/description/key_quotes).
   """
   use Oban.Worker, queue: :default, max_attempts: 3
 
@@ -57,15 +63,19 @@ defmodule Toscanini.Workers.AnnotateWorker do
            VoxIntelligence.annotate(transcript, bookmarks, model_opts) do
       existing = List.wrap(json_data["annotations"])
       built    = build_annotations(annotated, suggestions)
-      merged   = merge_annotations(existing, built)
+      {merged, kept} = merge_annotations(existing, built)
 
       json_data = Map.put(json_data, "annotations", merged)
       File.write!(json_path, Jason.encode!(json_data, pretty: true))
 
-      added = length(merged) - length(existing)
-      Logger.info("[Annotate] pipeline #{pid}: #{length(suggestions)} sugerida(s), #{added} nova(s)")
+      new_with_tier = attach_tier(kept, suggestions)
+
+      Logger.info("[Annotate] pipeline #{pid}: #{length(suggestions)} sugerida(s), #{length(kept)} nova(s)")
       Pipeline.save_result(pipeline, "annotate", %{
-        "done" => true, "suggested" => length(suggestions), "added" => added
+        "done" => true,
+        "suggested" => length(suggestions),
+        "added" => length(kept),
+        "new" => new_with_tier
       })
       Dispatcher.advance(pid)
       :ok
@@ -128,8 +138,25 @@ defmodule Toscanini.Workers.AnnotateWorker do
     end)
   end
 
+  # Anexa o `tier` (concept/data/reflection) da sugestão original a cada
+  # anotação nova, só para o NotifyWorker escolher o ícone — não é
+  # persistido no JSON do episódio.
+  defp attach_tier(kept, suggestions) do
+    tier_by_ts =
+      suggestions
+      |> Enum.map(fn s -> {to_seconds(s["ts"]), s["tier"]} end)
+      |> Map.new()
+
+    Enum.map(kept, fn a ->
+      Map.put(a, "tier", Map.get(tier_by_ts, to_seconds(a["ts"]), "reflection"))
+    end)
+  end
+
   # ---- Merge / dedup ---------------------------------------------------------
 
+  # Retorna {merged, kept}: `merged` é a lista completa (existentes + novas,
+  # ordenada) que vai pro JSON; `kept` é só as efetivamente novas pós-dedup,
+  # pra reportar no resultado do passo (NotifyWorker usa isso).
   defp merge_annotations(existing, new) do
     existing_secs = Enum.map(existing, &to_seconds(annotation_ts(&1)))
 
@@ -139,8 +166,11 @@ defmodule Toscanini.Workers.AnnotateWorker do
         not Enum.any?(existing_secs, fn es -> abs(es - s) < @window_secs end)
       end)
 
-    (existing ++ kept)
-    |> Enum.sort_by(fn a -> to_seconds(annotation_ts(a)) end)
+    merged =
+      (existing ++ kept)
+      |> Enum.sort_by(fn a -> to_seconds(annotation_ts(a)) end)
+
+    {merged, kept}
   end
 
   defp annotation_ts(a), do: a["ts"] || a["time"] || "00:00:00"

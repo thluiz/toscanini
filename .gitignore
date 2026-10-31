@@ -36,3 +36,6 @@ data/queue_schedules.json
 
 # Claude Code local settings
 .claude/
+
+# Runtime feed config (overwritten by API)
+data/feeds_config.json

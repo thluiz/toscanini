@@ -29,7 +29,12 @@ defmodule Toscanini.Pipeline do
 
   def save_result(pipeline, step, value) do
     results = get_results(pipeline) |> Map.put(to_string(step), value)
-    pipeline |> changeset(%{results: Jason.encode!(results)}) |> Repo.update!()
+
+    # Limpa o erro de tentativas anteriores: um passo que passou invalida a
+    # mensagem de falha antiga (senão o pipeline acaba `done` com `error` preenchido).
+    pipeline
+    |> changeset(%{results: Jason.encode!(results), error: nil})
+    |> Repo.update!()
   end
 
   def fail(pipeline, reason) do

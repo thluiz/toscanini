@@ -12,7 +12,7 @@ defmodule Toscanini.Workers.CollectWorker do
   @feed_retry_delays [1800, 3600]
 
   @impl Oban.Worker
-  def perform(%Oban.Job{args: %{"pipeline_id" => pid} = args}) do
+  def perform(%Oban.Job{args: %{"pipeline_id" => pid} = args} = job) do
     pipeline   = Repo.get!(Pipeline, pid)
     collector  = Pipelines.collector(pipeline.collector)
     params     = Pipeline.get_params(pipeline)
@@ -65,8 +65,20 @@ defmodule Toscanini.Workers.CollectWorker do
             :ok
         end
 
+      # Falha genérica (ex.: 403 do YouTube). Só marca falha definitiva (e
+      # portanto só notifica) na última tentativa do Oban. Nas intermediárias
+      # fica em "retrying" e deixa o Oban re-tentar em silêncio.
       {:error, reason} ->
-        Pipeline.fail(pipeline, reason)
+        if job.attempt >= job.max_attempts do
+          Pipeline.fail(pipeline, reason)
+        else
+          Logger.warning(
+            "[CollectWorker] #{pid}: tentativa #{job.attempt}/#{job.max_attempts} falhou, re-tentando: #{String.slice(to_string(reason), 0, 160)}"
+          )
+
+          mark_retrying(pipeline, reason)
+        end
+
         {:error, reason}
     end
   end
