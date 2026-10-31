@@ -1,5 +1,48 @@
 # Changelog
 
+## [0.2.27] — 2026-10-31
+
+Alterações que estavam rodando em produção direto no clone de serviço
+(`/home/hermes/services/toscanini`) sem nunca terem sido commitadas, feitas em
+2026-08-19 e 2026-09-20. Entram aqui como estavam no serviço, só com os acentos
+dos comentários restaurados (o `annotate_controller.ex` tinha sido gravado com
+`??` no lugar dos caracteres não-ASCII).
+
+### YouTube: player client `web_embedded` (2026-08-19)
+
+- **`lib/toscanini/collectors/youtube.ex`** — metadata e download passam
+  `--extractor-args youtube:player_client=web_embedded,android_vr`. O default
+  implícito (`android_vr`) levava 403 intermitente nas URLs de mídia.
+
+### Collect: falha genérica só é definitiva na última tentativa (2026-08-19)
+
+- **`lib/toscanini/workers/collect_worker.ex`** — `{:error, _}` genérico (ex.: 403
+  do YouTube) fica em `retrying` nas tentativas intermediárias do Oban e só chama
+  `Pipeline.fail` (e notifica) na última.
+- **`lib/toscanini/pipeline.ex`** — `save_result` limpa `error`: um passo que
+  passou invalida a falha anterior, senão o pipeline terminava `done` com `error`.
+
+### Notificação lista as anotações novas (2026-09-20)
+
+- **`lib/toscanini/workers/annotate_worker.ex`** — `merge_annotations` devolve
+  também as anotações efetivamente novas (pós-dedup); o resultado do passo ganha
+  `"new"`, com o `tier` da sugestão anexado. O JSON publicado não muda de schema.
+- **`lib/toscanini/workers/notify_worker.ex`** — com anotações novas, a notificação
+  vira a lista delas (ícone por tier, timestamp, título, descrição curta), dividida
+  em quantas mensagens o limite do Telegram exigir, com a URL só na última.
+
+### `POST /annotate`: re-anotar episódio publicado (2026-09-20)
+
+- **`lib/toscanini_web/controllers/annotate_controller.ex`** (novo) — recebe
+  `path` (relativo ao vox-content, ou só o slug) e cria um pipeline que começa em
+  `summarize`, de modo que o próximo passo é o `AnnotateWorker`; segue o fluxo
+  normal até `notify`. Sem re-coletar/transcrever/resumir.
+- **`lib/toscanini_web/router.ex`** — rota.
+
+### Outros
+
+- **`.gitignore`** — `data/feeds_config.json` (config de runtime, escrita pela API).
+
 ## [0.2.26] — 2026-10-31
 
 ### Guard contra transcrição degenerada

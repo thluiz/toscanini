@@ -15,6 +15,7 @@ defmodule ToscaniniWeb.Router do
     post "/batch",            BatchController, :create
     get  "/batch/:id",        BatchController, :show
     post "/publish/podcast",  PublishController, :create
+    post "/annotate",        AnnotateController, :create
     post "/publish/scholion", ScholionPublishController, :create
     post "/ingest/local",   IngestLocalController, :create
     post "/queue/:name/scale", QueueController, :scale

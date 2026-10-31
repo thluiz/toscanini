@@ -35,6 +35,12 @@ defmodule Toscanini.Collectors.Youtube do
   # reflete preferência (webm/Opus é o mais comum).
   @audio_extensions ~w[webm m4a opus mp4 mp3 ogg wav]
 
+  # Player clients do YouTube usados na extração. O default implícito do yt-dlp
+  # é `android_vr`, o único que ainda devolve formatos de áudio, mas as URLs de
+  # mídia dele levam 403 de forma intermitente. `web_embedded` devolve os mesmos
+  # formatos sem 403; `android_vr` fica como fallback.
+  @player_client "youtube:player_client=web_embedded,android_vr"
+
   defp ytdlp_bin do
     System.get_env("TOSCANINI_YTDLP_BIN") || "/home/hermes/.local/bin/yt-dlp"
   end
@@ -48,6 +54,7 @@ defmodule Toscanini.Collectors.Youtube do
       "--skip-download",
       "--no-warnings",
       "--no-playlist",
+      "--extractor-args", @player_client,
       "--print", template,
       url
     ], stderr_to_stdout: true) do
@@ -155,6 +162,7 @@ defmodule Toscanini.Collectors.Youtube do
           "--print", "after_move:filepath",
           "--no-warnings",
           "--no-playlist",
+          "--extractor-args", @player_client,
           "-o", template,
           url
         ], stderr_to_stdout: true) do
