@@ -1,7 +1,9 @@
 defmodule Toscanini.Workers.TranscribeWorker do
   use Oban.Worker, queue: :transcribe, max_attempts: 3
 
-  alias Toscanini.{Repo, Pipeline, Pipeline.Dispatcher}
+  require Logger
+
+  alias Toscanini.{Repo, Pipeline, Pipeline.Dispatcher, TranscriptCheck, Clients.GossipGate}
 
   @min_chars_per_sec 3
 
@@ -23,11 +25,11 @@ defmodule Toscanini.Workers.TranscribeWorker do
       :ok
     else
       audio_path = collect["audio"] || collect["mp3"]
-      run_transcription(pipeline, audio_path, json_path, json_data)
+      run_transcription(pipeline, audio_path, json_path, json_data, duration_secs)
     end
   end
 
-  defp run_transcription(pipeline, mp3_path, json_path, json_data) do
+  defp run_transcription(pipeline, mp3_path, json_path, json_data, duration_secs) do
     python_path   = Application.fetch_env!(:toscanini, :whisper_python_path)
     worker_path   = Application.fetch_env!(:toscanini, :whisper_worker_path)
     ld_lib_path   = Application.get_env(:toscanini, :whisper_ld_library_path, "")
@@ -61,11 +63,17 @@ defmodule Toscanini.Workers.TranscribeWorker do
             if word_count < 50 do
               {:error, "Insufficient transcription: #{word_count} words (minimum: 50)"}
             else
-              updated = Map.put(json_data, "transcript", transcript)
-              File.write!(json_path, Jason.encode!(updated, pretty: true))
-              Pipeline.save_result(pipeline, "transcribe", %{"done" => true})
-              Dispatcher.advance(pipeline.id)
-              :ok
+              case TranscriptCheck.check(transcript, duration_secs) do
+                :ok ->
+                  updated = Map.put(json_data, "transcript", transcript)
+                  File.write!(json_path, Jason.encode!(updated, pretty: true))
+                  Pipeline.save_result(pipeline, "transcribe", %{"done" => true})
+                  Dispatcher.advance(pipeline.id)
+                  :ok
+
+                {:error, reason} ->
+                  reject_degenerate(pipeline, reason)
+              end
             end
 
           {:error, reason} ->
@@ -75,6 +83,32 @@ defmodule Toscanini.Workers.TranscribeWorker do
     after
       File.rm_rf(job_dir)
     end
+  end
+
+  # Retentar não adianta (o Whisper repete o mesmo resultado e cada rodada custa
+  # até ~40min de CPU): falha o pipeline na hora e avisa. O transcript no JSON
+  # fica intocado, então nada degenerado chega ao summarize/Vox.
+  defp reject_degenerate(pipeline, reason) do
+    Logger.warning("[TranscribeWorker] #{pipeline.id}: #{reason}")
+    Pipeline.fail(pipeline, reason)
+
+    msg = """
+    <b>⚠️ Toscanini — transcrição rejeitada</b>
+
+    <b>Pipeline:</b> <code>#{pipeline.id}</code>
+    <b>Episódio:</b> #{html_escape(Pipeline.get_results(pipeline)["collect"]["title"] || "—")}
+    <b>Motivo:</b> #{html_escape(reason)}
+    """
+
+    GossipGate.send(String.trim(msg), "HTML")
+    {:cancel, reason}
+  end
+
+  defp html_escape(str) do
+    str
+    |> String.replace("&", "&amp;")
+    |> String.replace("<", "&lt;")
+    |> String.replace(">", "&gt;")
   end
 
   defp valid_transcript?(transcript, duration_secs) do
