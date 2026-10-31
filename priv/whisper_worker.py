@@ -212,40 +212,69 @@ def write_progress(progress_path, status, position="", duration_str="",
             pf.write(f"error: {error}\n")
 
 
-def detect_language(model, audio_path, duration):
-    """Sample audio from middle to detect language (avoids intro bias)."""
-    if duration and duration > 120:
-        offset = max(300, duration * 0.10)
-        offset = min(offset, duration - 60)
-    else:
-        offset = 0
+LANG_MIN_PROB = 0.5
 
+
+def sample_offsets(duration):
+    """Offsets (s) to sample for language detection, best first.
+    Skips the intro (300s or 10% on long audio) but never past 40% of the
+    duration — on short videos a fixed 300s lands on the outro/end screen."""
+    if not duration or duration <= 120:
+        return [0]
+    first = min(max(300, duration * 0.10), duration * 0.40)
+    return [int(first), int(duration * 0.20), int(duration * 0.60)]
+
+
+def detect_language_at(model, audio_path, offset):
+    """Returns (lang, prob) for a 30s sample at offset, or None."""
     tmp_path = None
     try:
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
             tmp_path = tmp.name
 
-        cmd = ["ffmpeg", "-i", audio_path, "-ss", str(int(offset)),
+        cmd = ["ffmpeg", "-nostdin", "-i", audio_path, "-ss", str(offset),
                "-t", "30", "-ar", "16000", "-ac", "1", tmp_path, "-y"]
         subprocess.run(cmd, capture_output=True, timeout=30)
 
         if not os.path.isfile(tmp_path) or os.path.getsize(tmp_path) == 0:
-            print("Warning: could not extract sample for language detection, using auto",
-                  file=sys.stderr)
+            print(f"Warning: could not extract sample at {offset}s", file=sys.stderr)
             return None
 
         _, lang_info = model.transcribe(tmp_path, beam_size=1)
         lang = lang_info.language
         prob = lang_info.language_probability
-        print(f"Language detected: {lang} (prob={prob:.2f}, sampled at {int(offset)}s)",
+        print(f"Language detected: {lang} (prob={prob:.2f}, sampled at {offset}s)",
               file=sys.stderr)
-        return lang
+        return lang, prob
     except Exception as e:
-        print(f"Warning: language detection failed ({e}), using auto", file=sys.stderr)
+        print(f"Warning: language detection at {offset}s failed ({e})", file=sys.stderr)
         return None
     finally:
         if tmp_path and os.path.isfile(tmp_path):
             os.unlink(tmp_path)
+
+
+def detect_language(model, audio_path, duration):
+    """Sample audio away from the intro to detect language. Tries further
+    samples while confidence is low; if none is confident, returns None so
+    faster-whisper auto-detects instead of forcing a wrong language (a forced
+    low-confidence guess on music/outro yields pure hallucination)."""
+    best = None
+    for offset in sample_offsets(duration):
+        result = detect_language_at(model, audio_path, offset)
+        if result is None:
+            continue
+        if best is None or result[1] > best[1]:
+            best = result
+        if best[1] >= LANG_MIN_PROB:
+            return best[0]
+
+    if best:
+        print(f"Language confidence too low (best {best[0]} prob={best[1]:.2f}), using auto",
+              file=sys.stderr)
+    else:
+        print("Warning: language detection failed, using auto", file=sys.stderr)
+    return None
 
 
 def transcribe(model, audio_path, output_path, progress_path, model_name, duration):

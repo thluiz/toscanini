@@ -1,5 +1,37 @@
 # Changelog
 
+## [0.2.26] — 2026-10-31
+
+### Guard contra transcrição degenerada
+
+Varredura do vox-content achou 7 episódios publicados com transcrição lixo
+(passavam no mínimo de 50 palavras): loops de uma frase a cada 30s
+("RAPADURACAST, O PODCAST DO PORTAL…", "Sous-titrage Société Radio-Canada"), um
+loop parcial de "." e um truncado em 5min de 42min.
+
+- **`lib/toscanini/transcript_check.ex`** (novo) — `check/2`: rejeita se uma
+  linha é ≥ 50% das linhas (loop) ou se o último timestamp cobre < 50% da duração
+  (truncada; só com duração ≥ 300s). Limiares sem falso positivo nas 5379
+  transcrições do acervo.
+- **`lib/toscanini/workers/transcribe_worker.ex`** — reprovada no check: falha o
+  pipeline, notifica no GossipGate com o motivo e retorna `{:cancel, _}` (sem
+  retry: o Whisper repetiria o resultado). O JSON não recebe o transcript.
+- **`test/toscanini/transcript_check_test.exs`** (novo).
+
+### Detecção de idioma do Whisper não força palpite de baixa confiança
+
+O `whisper_worker.py` amostrava 30s a partir de 300s fixos para pular a intro.
+Num vídeo curto isso caía no fim: em "Living In Barcelona SUCKS..." (376s, inglês)
+a amostra em 300s era o end screen, o Whisper chutou `ru` com prob=0.15 e o worker
+forçou `language="ru"` na transcrição inteira, saindo só alucinação ("Добро
+пожаловать на наш канал!" a cada 30s), que passou raspando no mínimo de 50 palavras.
+
+- **`priv/whisper_worker.py`** — `sample_offsets/1`: o primeiro offset continua
+  `max(300s, 10%)`, mas limitado a 40% da duração; amostras extras em 20% e 60%.
+  `detect_language` só fixa o idioma com prob ≥ 0.5 (tenta as amostras seguintes
+  enquanto estiver abaixo); sem amostra confiável, devolve `None` e o faster-whisper
+  detecta sozinho. `ffmpeg` da amostra ganha `-nostdin`.
+
 ## [0.2.25] — 2026-10-13
 
 ### `metadata.source_url` do PocketCasts vira link que abre
