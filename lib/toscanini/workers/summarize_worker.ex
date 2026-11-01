@@ -14,7 +14,8 @@ defmodule Toscanini.Workers.SummarizeWorker do
     metadata   = json_data["metadata"]
     timestamps = Pipeline.get_params(pipeline)["timestamps"] || []
 
-    case VoxIntelligence.process_podcast(metadata, transcript, timestamps) do
+    case VoxIntelligence.process_podcast(metadata, transcript, timestamps,
+           session_id: VoxIntelligence.pipeline_session(pid)) do
       {:ok, result} ->
         original_title = metadata["title"]
         json_data = Map.merge(json_data, result)

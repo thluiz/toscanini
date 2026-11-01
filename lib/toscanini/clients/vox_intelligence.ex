@@ -1,7 +1,20 @@
 defmodule Toscanini.Clients.VoxIntelligence do
   defp base_url, do: Application.fetch_env!(:toscanini, :base_url)
 
-  def process_podcast(metadata, transcript, timestamps) do
+  # Todas as funções aceitam `session_id:` em opts. Vai como header
+  # `x-session-id`; a vox-intelligence repassa ao OpenRouter como `session_id`,
+  # e o Broadcast (Langfuse) agrupa as chamadas de um mesmo pipeline.
+  defp session_headers(opts) do
+    case Keyword.get(opts, :session_id) do
+      nil -> []
+      sid -> [{"x-session-id", to_string(sid)}]
+    end
+  end
+
+  @doc "Session id do OpenRouter Broadcast para um pipeline do Toscanini."
+  def pipeline_session(pipeline_id), do: "toscanini:pipeline:#{pipeline_id}"
+
+  def process_podcast(metadata, transcript, timestamps, opts \\ []) do
     body = %{
       "transcript" => transcript,
       "timestamps" => timestamps || [],
@@ -10,6 +23,7 @@ defmodule Toscanini.Clients.VoxIntelligence do
 
     case Req.post("#{base_url()}/api/vox-intelligence/presets/podcast/episode",
            json: body,
+           headers: session_headers(opts),
            receive_timeout: 1_200_000) do
       {:ok, %{status: 200, body: %{"x-parsed" => result}}} ->
         {:ok, result}
@@ -41,6 +55,7 @@ defmodule Toscanini.Clients.VoxIntelligence do
 
     case Req.post("#{base_url()}/api/vox-intelligence/presets/podcast/suggest-annotations",
            json: body,
+           headers: session_headers(opts),
            receive_timeout: 600_000) do
       {:ok, %{status: 200, body: %{"x-parsed" => result}}} ->
         {:ok, result}
@@ -67,6 +82,7 @@ defmodule Toscanini.Clients.VoxIntelligence do
 
     case Req.post("#{base_url()}/api/vox-intelligence/presets/podcast/annotate",
            json: body,
+           headers: session_headers(opts),
            receive_timeout: 900_000) do
       {:ok, %{status: 200, body: %{"x-parsed" => result}}} when is_list(result) ->
         {:ok, result}
@@ -100,7 +116,7 @@ defmodule Toscanini.Clients.VoxIntelligence do
   "lexicalWarnings" => [...]}}` (o preset devolve o resultado direto, sem
   wrapper `x-parsed`).
   """
-  def synthesize_quote(%{quote: _} = input) do
+  def synthesize_quote(%{quote: _} = input, opts \\ []) do
     body = %{
       "quote"          => input.quote,
       "presumedAuthor" => Map.get(input, :presumed_author),
@@ -111,6 +127,7 @@ defmodule Toscanini.Clients.VoxIntelligence do
 
     case Req.post("#{base_url()}/api/vox-intelligence/presets/scholion/quote-note",
            json: body,
+           headers: session_headers(opts),
            receive_timeout: 300_000) do
       {:ok, %{status: 200, body: %{"slug" => _, "body" => _} = result}} ->
         {:ok, result}
@@ -128,11 +145,12 @@ defmodule Toscanini.Clients.VoxIntelligence do
   Retorna `{:ok, %{"verdict" => "green"|"yellow"|"red", "findings" => [...],
   "summary" => ...}}`.
   """
-  def ghost_audit(content, slug) when is_binary(content) do
+  def ghost_audit(content, slug, opts \\ []) when is_binary(content) do
     body = %{"content" => content, "slug" => slug}
 
     case Req.post("#{base_url()}/api/vox-intelligence/presets/scholion/ghost-audit",
            json: body,
+           headers: session_headers(opts),
            receive_timeout: 300_000) do
       {:ok, %{status: 200, body: %{"x-parsed" => parsed}}} ->
         {:ok, parsed}
