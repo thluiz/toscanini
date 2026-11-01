@@ -51,7 +51,8 @@ defmodule Toscanini.Workers.AnnotateWorker do
 
     model_opts = [
       model: Application.get_env(:toscanini, :annotate_model),
-      fallback_models: Application.get_env(:toscanini, :annotate_fallback_models, [])
+      fallback_models: Application.get_env(:toscanini, :annotate_fallback_models, []),
+      session_id: VoxIntelligence.pipeline_session(pid)
     ]
 
     with true <- is_binary(transcript) and String.trim(transcript) != "",

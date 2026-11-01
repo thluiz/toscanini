@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.2.30] — 2026-11-01
+
+### Chamadas à vox-intelligence agrupadas por pipeline no Langfuse
+
+A vox-intelligence 1.4.0 repassa o header `x-session-id` ao OpenRouter como
+`session_id`, e o Broadcast do OpenRouter manda isso ao Langfuse. Com o id do
+pipeline como sessão, dá para ver quanto custou cada episódio ou citação.
+
+- **`clients/vox_intelligence.ex`** — todas as funções aceitam `session_id:` em
+  `opts` e mandam o header; `pipeline_session/1` monta o valor
+  (`toscanini:pipeline:<id>`). `process_podcast`, `synthesize_quote` e
+  `ghost_audit` ganharam `opts \\ []`, então as chamadas antigas seguem valendo
+- **`AnnotateWorker`**, **`SummarizeWorker`** e **`ScholionSynthesizeWorker`** passam
+  o id do pipeline
+
 ## [0.2.29] — 2026-11-01
 
 ### Anotação automática passa a usar o Claude Sonnet 5.5

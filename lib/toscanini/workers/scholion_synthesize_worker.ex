@@ -27,7 +27,8 @@ defmodule Toscanini.Workers.ScholionSynthesizeWorker do
       from_book: input["from_book"]
     }
 
-    case VoxIntelligence.synthesize_quote(synth_input) do
+    case VoxIntelligence.synthesize_quote(synth_input,
+           session_id: VoxIntelligence.pipeline_session(pid)) do
       {:ok, fields} ->
         handle_result(pipeline, pid, fields, input["date"])
 
@@ -47,7 +48,8 @@ defmodule Toscanini.Workers.ScholionSynthesizeWorker do
     note = Note.to_markdown(fields, date)
 
     audit =
-      case VoxIntelligence.ghost_audit(note, slug) do
+      case VoxIntelligence.ghost_audit(note, slug,
+             session_id: VoxIntelligence.pipeline_session(pid)) do
         {:ok, parsed} -> parsed
         {:error, _} -> %{"verdict" => "unknown", "findings" => [], "summary" => "ghost-audit indisponível"}
       end
