@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.2.29] — 2026-11-01
+
+### Anotação automática passa a usar o Claude Sonnet 5.5
+
+A conta do OpenRouter ganhou uma chave Anthropic (BYOK), então os modelos
+`anthropic/*` saem pela conta Anthropic sem trocar a key do Toscanini.
+
+- **`config/config.exs`** — `annotate_model` vira `openrouter/anthropic/claude-sonnet-5.5`;
+  `gpt-5.2` e `gpt-5.1`, que atendiam antes, ficam como `annotate_fallback_models`
+  nessa ordem.
+
 ## [0.2.28] — 2026-10-31
 
 ### Whisper refaz a transcrição sem contexto quando sai em loop
