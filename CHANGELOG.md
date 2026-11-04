@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.31] — 2026-11-04
+
+### Frontmatter do Vox: aspas em valores que terminam em `:` ou começam com `@`
+
+Dois episódios commitados em 2026-11-03 tinham frontmatter YAML inválido (título
+terminando em `:` e `podcast: @Canal`). O `hugo` falhava no build e o publish do
+Vox ficou parado desde as 18:51, sem episódio novo no ar.
+
+- **`vox_pocketcast_json_renderer.ex`** — `needs_quoting?/1` passa a citar valores
+  que terminam em `:` e os que começam com `@`, `` ` `` ou `%`
+- Os dois `.md` afetados foram corrigidos direto no `vox-content`
+
 ## [0.2.30] — 2026-11-01
 
 ### Chamadas à vox-intelligence agrupadas por pipeline no Langfuse
