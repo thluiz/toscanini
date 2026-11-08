@@ -53,9 +53,10 @@ CPU_LOCK_PREFIX = "/tmp/whisper-cpu"
 MAX_CPU_SLOTS = 2
 
 
-def acquire_gpu_lock():
+def acquire_gpu_lock(quiet=False):
     """Try to acquire GPU lock. Returns True if acquired.
-    Checks PID in existing lock — clears stale locks from dead processes."""
+    Checks PID in existing lock — clears stale locks from dead processes.
+    quiet: don't log "held by pid" (used while a job re-polls the lock)."""
     pid = str(os.getpid())
     try:
         fd = os.open(GPU_LOCK, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
@@ -70,7 +71,8 @@ def acquire_gpu_lock():
     try:
         held_pid = int(open(GPU_LOCK).read().strip())
         os.kill(held_pid, 0)  # signal 0: check existence only
-        print(f"GPU lock held by pid={held_pid}, using CPU", file=sys.stderr)
+        if not quiet:
+            print(f"GPU lock held by pid={held_pid}, using CPU", file=sys.stderr)
         return False
     except (ValueError, FileNotFoundError):
         pass  # unreadable lock — treat as stale
@@ -101,47 +103,40 @@ def release_gpu_lock():
         pass
 
 
-def acquire_cpu_slot(max_slots=MAX_CPU_SLOTS, timeout=120, interval=5):
-    """Try to acquire a CPU slot. Waits up to timeout seconds.
-    Returns slot number (0-based) or -1 if timeout."""
+def try_acquire_cpu_slot(max_slots=MAX_CPU_SLOTS):
+    """One pass over the CPU slots. Returns the slot number (0-based) or None if
+    all are busy. Never runs without a slot: more than max_slots transcriptions
+    on the CPU at once fight for the same cores and every one of them crawls."""
     pid = str(os.getpid())
-    elapsed = 0
-    while True:
-        for i in range(max_slots):
-            lock = f"{CPU_LOCK_PREFIX}-{i}.lock"
+    for i in range(max_slots):
+        lock = f"{CPU_LOCK_PREFIX}-{i}.lock"
+        try:
+            fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            os.write(fd, pid.encode())
+            os.close(fd)
+            print(f"CPU slot {i} acquired (pid={pid})", file=sys.stderr)
+            return i
+        except FileExistsError:
+            # Check if stale
             try:
-                fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-                os.write(fd, pid.encode())
-                os.close(fd)
-                print(f"CPU slot {i} acquired (pid={pid})", file=sys.stderr)
-                return i
-            except FileExistsError:
-                # Check if stale
+                held_pid = int(open(lock).read().strip())
+                os.kill(held_pid, 0)
+                continue  # alive, try next slot
+            except (ProcessLookupError, ValueError, FileNotFoundError):
+                # Stale — try to take over atomically
                 try:
-                    held_pid = int(open(lock).read().strip())
-                    os.kill(held_pid, 0)
-                    continue  # alive, try next slot
-                except (ProcessLookupError, ValueError, FileNotFoundError):
-                    # Stale — try to take over atomically
-                    try:
-                        os.unlink(lock)
-                    except FileNotFoundError:
-                        pass
-                    try:
-                        fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-                        os.write(fd, pid.encode())
-                        os.close(fd)
-                        print(f"CPU slot {i} acquired after clearing stale (pid={pid})", file=sys.stderr)
-                        return i
-                    except FileExistsError:
-                        continue
-        if elapsed >= timeout:
-            print(f"CPU slot timeout after {timeout}s, proceeding anyway", file=sys.stderr)
-            return -1
-        if elapsed == 0:
-            print(f"All {max_slots} CPU slots busy, waiting...", file=sys.stderr)
-        time.sleep(interval)
-        elapsed += interval
+                    os.unlink(lock)
+                except FileNotFoundError:
+                    pass
+                try:
+                    fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+                    os.write(fd, pid.encode())
+                    os.close(fd)
+                    print(f"CPU slot {i} acquired after clearing stale (pid={pid})", file=sys.stderr)
+                    return i
+                except FileExistsError:
+                    continue
+    return None
 
 
 def release_cpu_slot(slot):
@@ -180,22 +175,38 @@ def gpu_cooldown_active(now_ts=None):
         return False
 
 
+SLOT_POLL_SECS = 5
+
+
 def select_model():
+    """Blocks until it holds the GPU lock or a CPU slot — never runs without one.
+    Each pass re-reads the window and the cooldown and retries the GPU lock, so a
+    job that waited for a CPU slot moves to the GPU as soon as it opens up."""
     from datetime import datetime
-    gpu_allowed = False
-    try:
-        schedules = json.load(open(os.path.join(DATA_DIR, "queue_schedules.json")))
-        gpu_allowed = window_allows_gpu(schedules, datetime.now())
-    except Exception:
-        # No config file — safe default: CPU only
-        print("No scheduler config found, defaulting to CPU", file=sys.stderr)
-    if gpu_allowed and gpu_cooldown_active():
-        print("GPU in cooldown after a previous abort, using CPU", file=sys.stderr)
+    waited = False
+    while True:
         gpu_allowed = False
-    if gpu_allowed and acquire_gpu_lock():
-        return "large-v3", "cuda", "float16", True, -1
-    cpu_slot = acquire_cpu_slot()
-    return "large-v3", "cpu", "int8", False, cpu_slot
+        try:
+            schedules = json.load(open(os.path.join(DATA_DIR, "queue_schedules.json")))
+            gpu_allowed = window_allows_gpu(schedules, datetime.now())
+        except Exception:
+            # No config file — safe default: CPU only
+            if not waited:
+                print("No scheduler config found, defaulting to CPU", file=sys.stderr)
+        if gpu_allowed and gpu_cooldown_active():
+            if not waited:
+                print("GPU in cooldown after a previous abort, using CPU", file=sys.stderr)
+            gpu_allowed = False
+        if gpu_allowed and acquire_gpu_lock(quiet=waited):
+            return "large-v3", "cuda", "float16", True, -1
+        cpu_slot = try_acquire_cpu_slot()
+        if cpu_slot is not None:
+            return "large-v3", "cpu", "int8", False, cpu_slot
+        if not waited:
+            print(f"GPU unavailable and all {MAX_CPU_SLOTS} CPU slots busy, waiting...",
+                  file=sys.stderr)
+            waited = True
+        time.sleep(SLOT_POLL_SECS)
 
 
 def wait_for_vram(target_mb=3500, timeout=45, interval=5):

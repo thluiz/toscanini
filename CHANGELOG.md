@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.2.33] — 2026-11-08
+
+### Whisper nunca roda sem slot: no máximo 2 transcrições em CPU ao mesmo tempo
+
+Com o cooldown da GPU aberto (ou o lock da GPU ocupado), o terceiro job da janela
+(`limit: 3`) ia para a CPU, esperava 120 s por um slot e então seguia "anyway" sem
+lock. Resultado: 3 transcrições em CPU disputando os mesmos núcleos, todas com ETA
+de 5 a 11 h para episódios de ~1 h.
+
+- **`whisper_worker.py`** — `select_model/0` agora bloqueia até conseguir o lock da
+  GPU ou um slot de CPU (`try_acquire_cpu_slot`, uma passada, sem timeout). A cada
+  5 s reavalia janela, cooldown e lock da GPU, então um job que esperava vaga vai
+  para a GPU assim que ela abre. O job de espera ocupa uma vaga do Oban sem
+  consumir CPU. `acquire_gpu_lock(quiet=True)` evita logar "held by pid" a cada
+  passada
+
 ## [0.2.32] — 2026-11-08
 
 ### Cooldown de 15 min da GPU quando o whisper aborta; janelas por dia da semana
