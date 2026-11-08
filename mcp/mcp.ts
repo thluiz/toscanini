@@ -253,6 +253,11 @@ const TOOLS = [
               limit: { type: "number", description: "Max concurrent jobs" },
               gpu:   { type: "boolean", description: "Whether GPU is used in this window" },
               cores: { type: "number", description: "CPU threads for whisper transcription (default: 14)" },
+              days:  {
+                type: "array",
+                items: { type: "string", enum: ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] },
+                description: "Days this window applies to (default: every day). First matching window wins, so put day-specific windows first",
+              },
             },
             required: ["from", "to", "limit"],
           },

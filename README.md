@@ -104,16 +104,18 @@ Toscanini runs **faster-whisper** locally via `priv/whisper_worker.py`. Model se
 |-----------|-------|--------|---------|
 | GPU allowed by scheduler + lock acquired | large-v3 | CUDA | float16 |
 | GPU unavailable or not allowed | large-v3 | CPU | int8 |
-| OOM during GPU transcription | large-v3 | CPU | int8 (auto-fallback) |
+| GPU cooldown open (whisper aborted on the GPU in the last 15 min) | large-v3 | CPU | int8 |
+| OOM during GPU transcription | large-v3 | CPU | int8 (auto-fallback, when Python catches it) |
 
 The scheduler controls concurrency, GPU access, and CPU thread count per time window:
 
 ```json
 {
   "transcribe": [
-    { "from": 0, "to": 9, "limit": 3, "gpu": true, "cores": 22 },
-    { "from": 9, "to": 20, "limit": 2, "gpu": false, "cores": 14 },
-    { "from": 20, "to": 24, "limit": 3, "gpu": true, "cores": 22 }
+    { "days": ["sat", "sun"], "from": 0, "to": 24, "limit": 3, "gpu": true, "cores": 14 },
+    { "from": 0, "to": 12, "limit": 3, "gpu": true, "cores": 14 },
+    { "from": 12, "to": 20, "limit": 2, "gpu": false, "cores": 14 },
+    { "from": 20, "to": 24, "limit": 3, "gpu": true, "cores": 14 }
   ]
 }
 ```
@@ -121,8 +123,11 @@ The scheduler controls concurrency, GPU access, and CPU thread count per time wi
 - **limit**: max concurrent Oban jobs
 - **gpu**: whether GPU is available in this window
 - **cores**: CPU threads passed to faster-whisper (default: 14)
+- **days** (optional): days the window applies to (`mon`..`sun`); without it the window applies every day. The first window matching hour and day wins, so put day-specific windows first
 
 GPU access is serialized via `/tmp/whisper-gpu.lock` (PID-based, with stale lock detection).
+
+**GPU cooldown.** When the whisper process dies on the GPU with exit 134 (`CUDA failed with error out of memory` aborts the whole process, so the Python fallback never runs), `TranscribeWorker` writes `data/gpu_cooldown.json` and snoozes the job instead of spending an attempt. For the next 15 minutes `whisper_worker.py` sends every job to the CPU; after that the next job tries the GPU again.
 
 ## MCP Integration
 

@@ -1,5 +1,34 @@
 # Changelog
 
+## [0.2.32] — 2026-11-08
+
+### Cooldown de 15 min da GPU quando o whisper aborta; janelas por dia da semana
+
+Na janela da GPU (00h–09h e 20h–24h) quase toda transcrição morria com
+`CUDA failed with error out of memory`: 146 abortos em 166 inícios na GPU entre
+07/11 e 08/11, 46 jobs descartados (exit 134) e 46 pipelines órfãos em
+`running / transcribe`, sem nenhum alerta de falha no status. O aborto é do
+CTranslate2 (`std::terminate`): derruba o processo inteiro, então o fallback para
+CPU que existia em `whisper_worker.py` nunca roda, e o Oban retentava na GPU até
+descartar. A RTX 3050 de 6 GB não comporta o `large-v3` em float16; a correção de
+fundo é hardware, então aqui só se limita o estrago.
+
+- **`gpu_cooldown.ex`** (novo) — `data/gpu_cooldown.json` com `until`; cooldown
+  fixo de 15 min, reiniciado a cada novo aborto
+- **`TranscribeWorker`** — exit 134 com a GPU em jogo (janela com `gpu: true` e sem
+  cooldown aberto) abre o cooldown e devolve o job à fila com `{:snooze, 10}`, sem
+  gastar tentativa; 134 fora da GPU segue como erro comum. `classify_exit/2` isola a regra
+- **`whisper_worker.py`** — `select_model/0` pula a GPU enquanto o cooldown estiver
+  aberto e manda o job para a CPU; passados os 15 min, o próximo job tenta a GPU de novo
+- **`scheduler.ex`** (novo) — as janelas de `queue_schedules.json` ganham `days`
+  opcional (`mon`..`sun`); sem `days` vale todo dia, a primeira janela que casa
+  com hora e dia ganha. Worker, controller e `whisper_worker.py` usam a mesma regra
+- **`SchedulerController`** — valida `days`; o limite aplicado no `PUT` agora usa
+  a hora local, como o worker (antes usava UTC)
+- **`priv/queue_schedules.json`** e README — janelas novas: sem GPU só de 12h às
+  20h em dia útil, GPU livre o dia todo no fim de semana
+- **`mcp/mcp.ts`** — `set_scheduler_config` documenta `days`
+
 ## [0.2.31] — 2026-11-04
 
 ### Frontmatter do Vox: aspas em valores que terminam em `:` ou começam com `@`

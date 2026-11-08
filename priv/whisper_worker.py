@@ -155,20 +155,43 @@ def release_cpu_slot(slot):
         pass
 
 
+DATA_DIR = os.environ.get("TOSCANINI_DATA_DIR", "/home/hermes/services/toscanini/data")
+WEEKDAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+
+
+def window_allows_gpu(schedules, now):
+    """Mesma regra de Toscanini.Scheduler.window_for/2: a primeira janela que casa
+    com a hora e o dia ('days' ausente = todos os dias) decide se a GPU vale."""
+    day = WEEKDAYS[now.weekday()]
+    for w in schedules.get("transcribe", []):
+        days = w.get("days")
+        if w["from"] <= now.hour < w["to"] and (days is None or day in days):
+            return w.get("gpu", False)
+    return False
+
+
+def gpu_cooldown_active(now_ts=None):
+    """Cooldown aberto pelo TranscribeWorker quando o whisper abortou na GPU (exit 134).
+    Enquanto data/gpu_cooldown.json estiver no futuro, nada vai para a GPU."""
+    try:
+        until = json.load(open(os.path.join(DATA_DIR, "gpu_cooldown.json")))["until"]
+        return (time.time() if now_ts is None else now_ts) < until
+    except Exception:
+        return False
+
+
 def select_model():
-    import json
     from datetime import datetime
-    hour = datetime.now().hour
     gpu_allowed = False
     try:
-        schedules = json.load(open("/home/hermes/services/toscanini/data/queue_schedules.json"))
-        for w in schedules.get("transcribe", []):
-            if w["from"] <= hour < w["to"]:
-                gpu_allowed = w.get("gpu", False)
-                break
+        schedules = json.load(open(os.path.join(DATA_DIR, "queue_schedules.json")))
+        gpu_allowed = window_allows_gpu(schedules, datetime.now())
     except Exception:
         # No config file — safe default: CPU only
         print("No scheduler config found, defaulting to CPU", file=sys.stderr)
+    if gpu_allowed and gpu_cooldown_active():
+        print("GPU in cooldown after a previous abort, using CPU", file=sys.stderr)
+        gpu_allowed = False
     if gpu_allowed and acquire_gpu_lock():
         return "large-v3", "cuda", "float16", True, -1
     cpu_slot = acquire_cpu_slot()

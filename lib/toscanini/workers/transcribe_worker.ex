@@ -4,6 +4,7 @@ defmodule Toscanini.Workers.TranscribeWorker do
   require Logger
 
   alias Toscanini.{Repo, Pipeline, Pipeline.Dispatcher, TranscriptCheck, Clients.GossipGate}
+  alias Toscanini.{GpuCooldown, Scheduler}
 
   @min_chars_per_sec 3
 
@@ -40,6 +41,8 @@ defmodule Toscanini.Workers.TranscribeWorker do
     File.mkdir_p!(job_dir)
 
     cores = get_current_cores(:transcribe)
+    # Fotografia de antes do run: se a GPU era candidata, um abort (134) é dela.
+    gpu_expected? = gpu_expected?()
 
     try do
       env = if ld_lib_path != "", do: [{"LD_LIBRARY_PATH", ld_lib_path}], else: []
@@ -53,36 +56,75 @@ defmodule Toscanini.Workers.TranscribeWorker do
         env: env
       )
 
-      if exit_code != 0 do
-        {:error, "whisper worker exited with code #{exit_code}"}
-      else
-        case File.read(output_path) do
-          {:ok, transcript} ->
-            word_count = transcript |> String.split() |> length()
+      case classify_exit(exit_code, gpu_expected?) do
+        :gpu_abort ->
+          gpu_aborted(pipeline)
 
-            if word_count < 50 do
-              {:error, "Insufficient transcription: #{word_count} words (minimum: 50)"}
-            else
-              case TranscriptCheck.check(transcript, duration_secs) do
-                :ok ->
-                  updated = Map.put(json_data, "transcript", transcript)
-                  File.write!(json_path, Jason.encode!(updated, pretty: true))
-                  Pipeline.save_result(pipeline, "transcribe", %{"done" => true})
-                  Dispatcher.advance(pipeline.id)
-                  :ok
+        {:error, _reason} = error ->
+          error
 
-                {:error, reason} ->
-                  reject_degenerate(pipeline, reason)
+        :ok ->
+          case File.read(output_path) do
+            {:ok, transcript} ->
+              word_count = transcript |> String.split() |> length()
+
+              if word_count < 50 do
+                {:error, "Insufficient transcription: #{word_count} words (minimum: 50)"}
+              else
+                case TranscriptCheck.check(transcript, duration_secs) do
+                  :ok ->
+                    updated = Map.put(json_data, "transcript", transcript)
+                    File.write!(json_path, Jason.encode!(updated, pretty: true))
+                    Pipeline.save_result(pipeline, "transcribe", %{"done" => true})
+                    Dispatcher.advance(pipeline.id)
+                    :ok
+
+                  {:error, reason} ->
+                    reject_degenerate(pipeline, reason)
+                end
               end
-            end
 
-          {:error, reason} ->
-            {:error, "output.txt not found after worker completed: #{reason}"}
-        end
+            {:error, reason} ->
+              {:error, "output.txt not found after worker completed: #{reason}"}
+          end
       end
     after
       File.rm_rf(job_dir)
     end
+  end
+
+  @gpu_abort_exit 134
+  @gpu_abort_snooze_secs 10
+
+  @doc false
+  # Exit 134 (SIGABRT) é o `CUDA failed with error out of memory` do CTranslate2:
+  # o processo inteiro cai e o fallback em Python nunca roda. Só vale como "GPU
+  # estourou" se a GPU era candidata nesse run; fora disso é erro comum (conta
+  # tentativa).
+  def classify_exit(0, _gpu_expected?), do: :ok
+  def classify_exit(@gpu_abort_exit, true), do: :gpu_abort
+  def classify_exit(exit_code, _gpu_expected?), do: {:error, "whisper worker exited with code #{exit_code}"}
+
+  # A GPU só entra no run se a janela atual permite e não há cooldown aberto
+  # (mesma regra de `select_model/0` em priv/whisper_worker.py).
+  defp gpu_expected? do
+    case Scheduler.current_window(:transcribe) do
+      %{"gpu" => true} -> not GpuCooldown.active?()
+      _ -> false
+    end
+  end
+
+  # Abre o cooldown e devolve o job à fila sem gastar tentativa (snooze): o
+  # próximo run vê o cooldown e vai para a CPU.
+  defp gpu_aborted(pipeline) do
+    until = GpuCooldown.start()
+
+    Logger.warning(
+      "[TranscribeWorker] #{pipeline.id}: whisper abortou na GPU (exit #{@gpu_abort_exit}); " <>
+        "GPU em cooldown por #{div(GpuCooldown.cooldown_secs(), 60)} min (até #{until}), job volta à fila"
+    )
+
+    {:snooze, @gpu_abort_snooze_secs}
   end
 
   # Retentar não adianta (o Whisper repete o mesmo resultado e cada rodada custa
@@ -119,31 +161,15 @@ defmodule Toscanini.Workers.TranscribeWorker do
   @default_cores 14
 
   defp get_current_cores(queue) do
-    path = Path.join(Application.get_env(:toscanini, :data_dir, "data"), "queue_schedules.json")
-    hour = NaiveDateTime.local_now().hour
-    with {:ok, raw} <- File.read(path),
-         {:ok, schedules} <- Jason.decode(raw),
-         windows when is_list(windows) <- schedules[Atom.to_string(queue)] do
-      case Enum.find(windows, fn %{"from" => f, "to" => t} -> hour >= f and hour < t end) do
-        %{"cores" => cores} when is_integer(cores) -> cores
-        _ -> @default_cores
-      end
-    else
+    case Scheduler.current_window(queue) do
+      %{"cores" => cores} when is_integer(cores) -> cores
       _ -> @default_cores
     end
   end
 
   defp apply_queue_concurrency(queue) do
-    path = Path.join(Application.get_env(:toscanini, :data_dir, "data"), "queue_schedules.json")
-    hour = NaiveDateTime.local_now().hour
-    with {:ok, raw} <- File.read(path),
-         {:ok, schedules} <- Jason.decode(raw),
-         windows when is_list(windows) <- schedules[Atom.to_string(queue)] do
-      case Enum.find(windows, fn %{"from" => f, "to" => t} -> hour >= f and hour < t end) do
-        %{"limit" => limit} -> Oban.scale_queue(queue: queue, limit: limit)
-        nil -> :ok
-      end
-    else
+    case Scheduler.current_window(queue) do
+      %{"limit" => limit} -> Oban.scale_queue(queue: queue, limit: limit)
       _ -> :ok
     end
   end
