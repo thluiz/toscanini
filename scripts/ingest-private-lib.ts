@@ -1,0 +1,74 @@
+/** Funções puras do ingest-private (testadas em ingest-private.test.ts). */
+
+/** "Introdução à Filosofia 01" -> "introducao-a-filosofia-01": minúsculas, sem acento, [a-z0-9-]. */
+export function slugify(text: string): string {
+  return text
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+/** Título legível a partir do nome do arquivo: tira extensão e prefixo de ordem ("03 - ", "03_", "03."). */
+export function titleFromFilename(filename: string): string {
+  const base = filename.replace(/\.[^.]+$/, "");
+  const cleaned = base.replace(/^\s*\d{1,3}\s*[-_.)]\s*/, "").replace(/[_]+/g, " ").replace(/\s+/g, " ").trim();
+  return cleaned || base.trim();
+}
+
+/** Slug estável do episódio: curso + arquivo. Reenviar o mesmo arquivo gera o mesmo slug (o servidor ignora o repetido). */
+export function episodeSlug(course: string, filename: string): string {
+  const base = filename.replace(/\.[^.]+$/, "");
+  return [slugify(course), slugify(base)].filter(Boolean).join("-");
+}
+
+/** 3725 -> "01:02:05" */
+export function formatDuration(totalSecs: number): string {
+  const s = Math.max(0, Math.round(totalSecs));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  return [h, m, sec].map((n) => String(n).padStart(2, "0")).join(":");
+}
+
+export interface IngestPayload {
+  slug: string;
+  duration_secs: number;
+  private: true;
+  source_url: string;
+  json: {
+    version: 1;
+    metadata: Record<string, unknown>;
+    transcript: null;
+  };
+}
+
+/** Corpo do POST /ingest/local para um arquivo de curso. */
+export function buildPayload(opts: {
+  course: string;
+  filename: string;
+  durationSecs: number;
+  publishedIso: string;
+  author?: string;
+  uuid: string;
+}): IngestPayload {
+  const title = titleFromFilename(opts.filename);
+  const metadata: Record<string, unknown> = {
+    podcast: opts.course,
+    title,
+    published: opts.publishedIso,
+    duration: formatDuration(opts.durationSecs),
+    uuid: opts.uuid,
+    source: "local",
+    source_url: "",
+  };
+  if (opts.author) metadata.author = opts.author;
+  return {
+    slug: episodeSlug(opts.course, opts.filename),
+    duration_secs: Math.round(opts.durationSecs),
+    private: true,
+    source_url: "",
+    json: { version: 1, metadata, transcript: null },
+  };
+}

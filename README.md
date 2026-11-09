@@ -132,6 +132,21 @@ GPU access is serialized via `/tmp/whisper-gpu.lock` (PID-based, with stale lock
 
 **GPU cooldown.** When the whisper process dies on the GPU with exit 134 (`CUDA failed with error out of memory` aborts the whole process, so the Python fallback never runs), `TranscribeWorker` writes `data/gpu_cooldown.json` and snoozes the job instead of spending an attempt. For the next 15 minutes `whisper_worker.py` sends every job to the CPU; after that the next job tries the GPU again.
 
+## Private courses
+
+MP3 files of courses and classes go through the same pipeline but never reach the public site.
+They are written to `vox-private-content` (`TOSCANINI_VOX_PRIVATE_DIR`), keep their local MP3
+forever (the retention sweep skips anything with `metadata.private`) and use the same layout as
+`vox-content`, so `/annotate`, `vox-fetch` and the audio slicing work on them unchanged.
+
+```bash
+bun scripts/ingest-private.ts --course "Course name" [--author "Name"] [--dry-run] <file-or-folder>...
+```
+
+Run it again whenever new files arrive: copies are skipped when the size already matches and the
+server ignores slugs it already processed. `POST /jobs`, `/batch` and the MCP `submit_job`/`submit_batch`
+tools also accept `private: true`.
+
 ## MCP Integration
 
 The `toscanini-mcp/` directory contains a TypeScript MCP server exposing all orchestrator operations to Claude Code:

@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.2.38] — 2026-11-09
+
+### `scripts/ingest-private.ts`: MP3 de cursos para o pipeline privado, em lote
+
+Os MP3 de cursos e aulas chegam aos poucos; o script pode ser rodado de novo sobre a mesma
+pasta e só o que é novo entra.
+
+- `bun scripts/ingest-private.ts --course "Nome do Curso" [--author N] [--dry-run] <arquivo-ou-pasta>...`
+- Para cada MP3: copia para `/home/hermes/collected` com o slug `<curso>-<arquivo>` (pula a cópia
+  se o tamanho já bate), mede a duração com o `ffprobe` do HermesTools e chama
+  `POST /ingest/local` com `private: true`. O título sai do nome do arquivo sem extensão nem
+  prefixo de ordem; o curso vira o campo "podcast"; a data é a do arquivo
+- Funções puras em `ingest-private-lib.ts`, testadas com `bun test scripts/`; a cópia binária
+  pelo stdin, o tamanho e a duração foram conferidos à parte no HermesTools (md5 idêntico)
+- Só funciona de verdade a partir da v0.2.37 em produção (antes o `/ingest/local` ignora `private`)
+
 ## [0.2.37] — 2026-11-09
 
 ### Modo privado completo no Toscanini; remove os passos de verificação de URL e Facebook
