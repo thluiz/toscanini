@@ -20,6 +20,9 @@ describe("titleFromFilename", () => {
   test("nome só numérico não vira título vazio", () => {
     expect(titleFromFilename("2026.mp3")).toBe("2026");
   });
+  test("nome em kebab-case vira texto com espaços e inicial maiúscula", () => {
+    expect(titleFromFilename("aula-extra-uma-visao-realista.mp3")).toBe("Aula extra uma visao realista");
+  });
 });
 
 describe("episodeSlug", () => {
@@ -31,6 +34,21 @@ describe("episodeSlug", () => {
   });
   test("mesmo arquivo em cursos diferentes gera slugs diferentes", () => {
     expect(episodeSlug("A", "01.mp3")).not.toBe(episodeSlug("B", "01.mp3"));
+  });
+  test("não repete no prefixo o que o nome do arquivo já diz", () => {
+    expect(
+      episodeSlug(
+        "Petit Cursos: Henry Kissinger",
+        "aula-extra-henry-kissinger-uma-visao-realista-da-diplomacia.mp3",
+      ),
+    ).toBe("petit-cursos-aula-extra-henry-kissinger-uma-visao-realista-da-diplomacia");
+  });
+  test("curso inteiro já no arquivo: o slug é só o do arquivo", () => {
+    expect(episodeSlug("Espinosa", "aula-espinosa-01.mp3")).toBe("aula-espinosa-01");
+  });
+  test("o slug continua estável entre execuções", () => {
+    const a = episodeSlug("Petit Cursos: Henry Kissinger", "aula-extra-henry-kissinger.mp3");
+    expect(episodeSlug("Petit Cursos: Henry Kissinger", "aula-extra-henry-kissinger.mp3")).toBe(a);
   });
 });
 

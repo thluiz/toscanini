@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.2.39] — 2026-11-09
+
+### ingest-private: slug sem repetir o curso, título legível e `--title`
+
+O primeiro arquivo real ("aula-extra-henry-kissinger-…" no curso "Petit Cursos: Henry Kissinger") gerava o
+slug `petit-cursos-henry-kissinger-aula-extra-henry-kissinger-…`, repetindo o nome.
+
+- **Slug** — as palavras do curso que já aparecem no nome do arquivo saem do prefixo
+  (`petit-cursos-aula-extra-henry-kissinger-…`); continua estável entre execuções
+- **Título** — nome de arquivo em kebab-case vira texto com espaços e inicial maiúscula (sem acentos:
+  eles não existem no nome do arquivo)
+- **`--title "Título"`** (um arquivo por vez) define o título, com acentos, quando o nome do arquivo não basta
+
 ## [0.2.38] — 2026-11-09
 
 ### `scripts/ingest-private.ts`: MP3 de cursos para o pipeline privado, em lote

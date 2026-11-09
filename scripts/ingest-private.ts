@@ -2,7 +2,9 @@
 /**
  * Envia MP3 de cursos/aulas para o Toscanini como conteúdo PRIVADO.
  *
- *   bun scripts/ingest-private.ts --course "Nome do Curso" [--author "Nome"] [--dry-run] <arquivo-ou-pasta>...
+ *   bun scripts/ingest-private.ts --course "Nome do Curso" [--author "Nome"] [--title "Título"] [--dry-run] <arquivo-ou-pasta>...
+ *
+ * --title (só com um arquivo) substitui o título tirado do nome do arquivo.
  *
  * Para cada MP3: copia para /home/hermes/collected (HermesTools) com o slug "<curso>-<arquivo>",
  * mede a duração com o ffprobe de lá e chama POST /ingest/local com private: true. O pipeline
@@ -25,15 +27,21 @@ const opt = (name: string) => {
   const i = args.indexOf(name);
   return i >= 0 ? args[i + 1] : undefined;
 };
-const valueFlags = new Set(["--course", "--author"]);
+const valueFlags = new Set(["--course", "--author", "--title"]);
 const paths = args.filter((a, i) => !a.startsWith("--") && !valueFlags.has(args[i - 1] ?? ""));
 
 const course = opt("--course");
 const author = opt("--author");
+const title = opt("--title");
 const dryRun = flag("--dry-run");
 
+if (title && paths.length !== 1) {
+  console.error("--title só vale para um único arquivo");
+  process.exit(2);
+}
+
 if (!course || paths.length === 0) {
-  console.error('uso: bun scripts/ingest-private.ts --course "Nome do Curso" [--author "Nome"] [--dry-run] <arquivo-ou-pasta>...');
+  console.error('uso: bun scripts/ingest-private.ts --course "Nome do Curso" [--author "Nome"] [--title "Título"] [--dry-run] <arquivo-ou-pasta>...');
   process.exit(2);
 }
 
@@ -88,6 +96,7 @@ for (const file of files) {
     const payload = buildPayload({
       course,
       filename: name,
+      title,
       durationSecs,
       publishedIso: statSync(file).mtime.toISOString().slice(0, 10),
       author,

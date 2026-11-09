@@ -10,17 +10,32 @@ export function slugify(text: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
-/** Título legível a partir do nome do arquivo: tira extensão e prefixo de ordem ("03 - ", "03_", "03."). */
+/**
+ * Título legível a partir do nome do arquivo: tira extensão e prefixo de ordem ("03 - ", "03_", "03.").
+ * Nome em kebab-case ("aula-extra-uma-visao") vira texto com espaços e a primeira letra maiúscula.
+ */
 export function titleFromFilename(filename: string): string {
   const base = filename.replace(/\.[^.]+$/, "");
-  const cleaned = base.replace(/^\s*\d{1,3}\s*[-_.)]\s*/, "").replace(/[_]+/g, " ").replace(/\s+/g, " ").trim();
+  let cleaned = base.replace(/^\s*\d{1,3}\s*[-_.)]\s*/, "").replace(/[_]+/g, " ").replace(/\s+/g, " ").trim();
+  if (cleaned && !cleaned.includes(" ") && cleaned.includes("-")) {
+    cleaned = cleaned.replace(/-+/g, " ");
+    cleaned = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+  }
   return cleaned || base.trim();
 }
 
-/** Slug estável do episódio: curso + arquivo. Reenviar o mesmo arquivo gera o mesmo slug (o servidor ignora o repetido). */
+/**
+ * Slug estável do episódio: curso + arquivo, sem repetir o que já está no nome do arquivo. As palavras do
+ * curso que aparecem no arquivo ("henry-kissinger" em "Petit Cursos: Henry Kissinger" e em
+ * "aula-extra-henry-kissinger-...") saem do prefixo. Reenviar o mesmo arquivo gera o mesmo slug (o
+ * servidor ignora o repetido).
+ */
 export function episodeSlug(course: string, filename: string): string {
   const base = filename.replace(/\.[^.]+$/, "");
-  return [slugify(course), slugify(base)].filter(Boolean).join("-");
+  const fileSlug = slugify(base);
+  const inFile = new Set(fileSlug.split("-"));
+  const prefix = slugify(course).split("-").filter((w) => w && !inFile.has(w)).join("-");
+  return [prefix, fileSlug].filter(Boolean).join("-");
 }
 
 /** 3725 -> "01:02:05" */
@@ -48,12 +63,13 @@ export interface IngestPayload {
 export function buildPayload(opts: {
   course: string;
   filename: string;
+  title?: string;
   durationSecs: number;
   publishedIso: string;
   author?: string;
   uuid: string;
 }): IngestPayload {
-  const title = titleFromFilename(opts.filename);
+  const title = opts.title?.trim() || titleFromFilename(opts.filename);
   const metadata: Record<string, unknown> = {
     podcast: opts.course,
     title,
