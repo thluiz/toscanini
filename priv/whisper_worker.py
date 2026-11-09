@@ -3,11 +3,10 @@
 Whisper GPU worker for HermesTools.
 Usage: worker.py <mp3-path> <output-txt> <progress-file> [cores]
 
-Dynamic model selection based on free VRAM:
-  >= 3.5 GB → large-v3 GPU float16
-  >= 2.0 GB → medium GPU float16
-  <  2.0 GB → medium CPU int8
-  OOM during transcription → retry medium CPU int8
+Device selection (select_model): GPU only inside a schedule window with gpu=true, with
+no GPU cooldown open, holding the GPU lock and with at least MIN_FREE_VRAM_MB free
+(large-v3 float16 uses ~5 GB of the 6 GB card) → large-v3 GPU float16. Otherwise it
+takes one of the 2 CPU slots → large-v3 CPU int8. It never runs without a lock/slot.
 """
 import sys
 import os
@@ -176,6 +175,10 @@ def gpu_cooldown_active(now_ts=None):
 
 
 SLOT_POLL_SECS = 5
+# O large-v3 float16 ocupa ~5 GB dos 6 GB da RTX 3050: com menos que isto livre
+# (algo mais usando a GPU), ele cai com CUDA out of memory. Em MiB, como o nvidia-smi.
+MIN_FREE_VRAM_MB = int(os.environ.get("WHISPER_MIN_FREE_VRAM_MB", "5200"))
+VRAM_WAIT_SECS = int(os.environ.get("WHISPER_VRAM_WAIT_SECS", "20"))
 
 
 def select_model():
@@ -198,7 +201,15 @@ def select_model():
                 print("GPU in cooldown after a previous abort, using CPU", file=sys.stderr)
             gpu_allowed = False
         if gpu_allowed and acquire_gpu_lock(quiet=waited):
-            return "large-v3", "cuda", "float16", True, -1
+            # Com o lock em mãos, nenhum outro whisper pega a GPU: dá uma folga curta
+            # para a VRAM do job anterior ser liberada. Se ainda assim não houver
+            # VRAM para o large-v3, não vale começar na GPU só para cair.
+            free = wait_for_vram(MIN_FREE_VRAM_MB, timeout=VRAM_WAIT_SECS)
+            if free >= MIN_FREE_VRAM_MB:
+                return "large-v3", "cuda", "float16", True, -1
+            print(f"GPU skipped: only {free} MB VRAM free, need {MIN_FREE_VRAM_MB} MB",
+                  file=sys.stderr)
+            release_gpu_lock()
         cpu_slot = try_acquire_cpu_slot()
         if cpu_slot is not None:
             return "large-v3", "cpu", "int8", False, cpu_slot

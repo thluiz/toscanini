@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.2.36] — 2026-11-09
+
+### Whisper só pega a GPU com 5,2 GB de VRAM livres; modelo de janelas 10h–21h
+
+O large-v3 em float16 ocupa quase toda a VRAM da RTX 3050 (~5 de 6 GB): qualquer
+outro uso da GPU o derruba com `CUDA out of memory`. Começar assim só gasta a
+tentativa, então a checagem passa a ser antes de começar.
+
+- **`whisper_worker.py`** — com o lock da GPU em mãos, `select_model/0` espera até
+  20 s a VRAM do job anterior ser liberada (`wait_for_vram`) e exige
+  `WHISPER_MIN_FREE_VRAM_MB` (padrão 5200 MiB) livres; senão solta o lock e segue
+  para a CPU. `nvidia-smi` falhando conta como 0 (CPU, nunca GPU às cegas).
+  `WHISPER_VRAM_WAIT_SECS` ajusta a folga
+- **`priv/queue_schedules.json`** e README — modelo alinhado com produção: sem GPU
+  das 10h às 21h em dia útil, GPU livre no fim de semana. Docstring do worker
+  corrigido (descrevia uma seleção por VRAM que não existia)
+
 ## [0.2.35] — 2026-11-09
 
 ### Remove o passo `vox_publish` (código morto do tempo do Quartz + Azure)

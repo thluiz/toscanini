@@ -2,7 +2,10 @@
   "transcribe": [
     {
       "cores": 14,
-      "days": ["sat", "sun"],
+      "days": [
+        "sat",
+        "sun"
+      ],
       "from": 0,
       "gpu": true,
       "limit": 3,
@@ -13,18 +16,18 @@
       "from": 0,
       "gpu": true,
       "limit": 3,
-      "to": 12
+      "to": 10
     },
     {
       "cores": 14,
-      "from": 12,
+      "from": 10,
       "gpu": false,
       "limit": 2,
-      "to": 20
+      "to": 21
     },
     {
       "cores": 14,
-      "from": 20,
+      "from": 21,
       "gpu": true,
       "limit": 3,
       "to": 24
