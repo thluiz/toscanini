@@ -27,6 +27,23 @@ defmodule Toscanini.Pipeline do
   def get_params(%__MODULE__{params: p}), do: Jason.decode!(p)
   def get_results(%__MODULE__{results: r}), do: Jason.decode!(r)
 
+  @doc """
+  Pipeline privado (`params.private == true`): o conteúdo vai para o repo git
+  privado (`TOSCANINI_VOX_PRIVATE_DIR`), nunca para o vox-content público.
+  """
+  def private?(%__MODULE__{} = pipeline), do: get_params(pipeline)["private"] == true
+
+  @doc """
+  Diretório do repo onde o pipeline escreve e commita. Para pipeline privado
+  exige `TOSCANINI_VOX_PRIVATE_DIR` e falha (`fetch_env!`) se faltar — jamais
+  cai no repo público.
+  """
+  def content_dir(%__MODULE__{} = pipeline) do
+    if private?(pipeline),
+      do: System.fetch_env!("TOSCANINI_VOX_PRIVATE_DIR"),
+      else: System.fetch_env!("TOSCANINI_VOX_CONTENT_DIR")
+  end
+
   def save_result(pipeline, step, value) do
     results = get_results(pipeline) |> Map.put(to_string(step), value)
 

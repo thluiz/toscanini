@@ -6,10 +6,9 @@ defmodule Toscanini.Workers.WriteFilesWorker do
 
   @impl Oban.Worker
   def perform(%{args: %{"pipeline_id" => pid}}) do
-    vox_content_dir = System.fetch_env!("TOSCANINI_VOX_CONTENT_DIR")
-
     pipeline  = Repo.get!(Pipeline, pid)
-    collect   = Pipeline.get_results(pipeline)["collect"]
+    vox_content_dir = Pipeline.content_dir(pipeline)
+    collect  = Pipeline.get_results(pipeline)["collect"]
     json_path = collect["json"]
     json_data = json_path |> File.read!() |> Jason.decode!()
 

@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.2.34] — 2026-11-09
+
+### Base do pipeline privado: conteúdo no repo git privado, sem URL pública
+
+Trabalho que estava só no working tree, agora commitado. Um pipeline com
+`params.private == true` escreve e commita no repo apontado por
+`TOSCANINI_VOX_PRIVATE_DIR` em vez do `vox-content` público, e a notificação não
+leva link público (o repo privado não é servido). **Ainda não há como criar um
+pipeline privado**: nenhum endpoint nem tool MCP preenche `private`, então todo
+pipeline continua público e o comportamento atual não muda.
+
+- **`Pipeline`** — `private?/1` e `content_dir/1`; um pipeline privado sem
+  `TOSCANINI_VOX_PRIVATE_DIR` falha (`fetch_env!`), nunca cai no repo público
+- **`WriteFilesWorker`** e **`GitCommitWorker`** — usam `Pipeline.content_dir/1`
+- **`NotifyWorker`** — pipeline privado manda só o path, sem URL, nas mensagens
+  padrão e de anotação. `build_message` ganhou o argumento `private?`: o commit
+  parcial chamava `build_message/8` com a função ainda de 7 argumentos e o módulo
+  não compilava
+- **Testes** — `pipeline_private_test.exs` cobre `private?/1`, `content_dir/1` e a
+  falha sem a variável de ambiente
+
 ## [0.2.33] — 2026-11-08
 
 ### Whisper nunca roda sem slot: no máximo 2 transcrições em CPU ao mesmo tempo

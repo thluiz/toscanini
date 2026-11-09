@@ -5,9 +5,8 @@ defmodule Toscanini.Workers.GitCommitWorker do
 
   @impl Oban.Worker
   def perform(%{args: %{"pipeline_id" => pid}}) do
-    vox_content_dir = System.fetch_env!("TOSCANINI_VOX_CONTENT_DIR")
-
     pipeline    = Repo.get!(Pipeline, pid)
+    vox_content_dir = Pipeline.content_dir(pipeline)
     write_files = Pipeline.get_results(pipeline)["write_files"]
     dest_json   = write_files["dest_json"]
     dest_md     = write_files["dest_md"]

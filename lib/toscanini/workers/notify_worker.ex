@@ -96,7 +96,9 @@ defmodule Toscanini.Workers.NotifyWorker do
     duration    = get_in(json_data, ["metadata", "duration"]) || ""
     description = json_data["description"] || ""
     timeline    = json_data["timeline"] || []
+    # Privado: sem URL pública (o repo privado não é servido); só o path.
     vox_path    = write_files["vox_path"]
+    private?    = Pipeline.private?(pipeline)
     new_annotations = annotate["new"] || []
 
     vox_base_url = Application.get_env(:toscanini, :vox_base_url, "https://vox.thluiz.com")
@@ -105,13 +107,14 @@ defmodule Toscanini.Workers.NotifyWorker do
       # Anotação (backlog manual ou feed auto_annotate): manda a lista das
       # anotações novas — com resumo — dividida em quantas mensagens forem
       # necessárias pro limite do Telegram, com a URL completa só na última.
-      url = build_url(vox_path, vox_base_url)
+      url = if private?, do: nil, else: build_url(vox_path, vox_base_url)
 
       new_annotations
       |> build_annotation_messages(title, podcast, duration, url)
       |> Enum.each(&GossipGate.send/1)
     else
-      msg = build_message(title, podcast, duration, description, timeline, vox_path, vox_base_url)
+      msg =
+        build_message(title, podcast, duration, description, timeline, vox_path, vox_base_url, private?)
       GossipGate.send(msg)
     end
 
@@ -221,7 +224,7 @@ defmodule Toscanini.Workers.NotifyWorker do
 
   # ---- Mensagem padrão (sem anotações novas — comportamento original) -------
 
-  defp build_message(title, podcast, duration, description, timeline, vox_path, vox_base_url) do
+  defp build_message(title, podcast, duration, description, timeline, vox_path, vox_base_url, private?) do
     header = """
     ✅ <b>#{escape(title)}</b>
     <i>#{escape(podcast)}#{if duration != "", do: " · #{escape(duration)}", else: ""}</i>
@@ -238,7 +241,7 @@ defmodule Toscanini.Workers.NotifyWorker do
         else: ""
 
     url_block =
-      if vox_path do
+      if vox_path && !private? do
         url = "#{vox_base_url}/#{String.replace_suffix(vox_path, ".md", "")}"
         "\n🔗 <a href=\"#{url}\">#{escape(url)}</a>\n"
       else
