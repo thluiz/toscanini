@@ -32,8 +32,6 @@ Environment=TOSCANINI_SCHOLION_DIR=/home/hermes/scholion
 # Environment=SCHOLION_BASE_URL=https://scholion.thluiz.com
 Environment=GOSSIPGATE_API_KEY=<REDACTED:GOSSIPGATE_API_KEY>
 Environment=VOX_BASE_URL=https://vox.thluiz.com
-Environment=FACEBOOK_APP_TOKEN=<REDACTED:FACEBOOK_APP_TOKEN>
-Environment=FACEBOOK_REFRESH_DELAY=120
 Environment=WHISPER_PYTHON_PATH=/home/hermes/whisper-venv/bin/python3
 Environment=WHISPER_WORKER_PATH=/home/hermes/services/toscanini/priv/whisper_worker.py
 Environment=WHISPER_LD_LIBRARY_PATH=/home/hermes/whisper-venv/lib/python3.10/site-packages/nvidia/cublas/lib:/home/hermes/whisper-venv/lib/python3.10/site-packages/nvidia/cudnn/lib:/usr/lib/wsl/lib

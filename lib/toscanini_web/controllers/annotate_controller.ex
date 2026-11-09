@@ -2,7 +2,8 @@ defmodule ToscaniniWeb.AnnotateController do
   @moduledoc """
   Re-anota um episódio já publicado, sem re-coletar/re-transcrever/re-resumir.
 
-  Recebe o path relativo do episódio em vox-content (com ou sem extensão) e
+  Recebe o path relativo do episódio em vox-content ou vox-private-content (com ou
+  sem extensão, e com ou sem o prefixo `privado/<token>/` do site privado) e
   inicia o pipeline direto no passo `summarize`, de forma que o próximo passo
   seja `annotate` (Toscanini.Workers.AnnotateWorker), o mesmo worker que já
   roda em produção para os feeds com `auto_annotate: true`. Dali em diante o
@@ -10,14 +11,13 @@ defmodule ToscaniniWeb.AnnotateController do
   s3_archive → notify. Sem gate humano, por design (ver AnnotateWorker).
   """
   use ToscaniniWeb, :controller
-  alias Toscanini.{Repo, Pipeline, Pipeline.Dispatcher}
+  alias Toscanini.{ContentRepos, Repo, Pipeline, Pipeline.Dispatcher}
 
   def create(conn, %{"path" => path}) do
-    vox_content_dir = System.fetch_env!("TOSCANINI_VOX_CONTENT_DIR")
     slug = slug_of(path)
 
-    case resolve_json_path(vox_content_dir, path, slug) do
-      {:ok, json_path} ->
+    case ContentRepos.locate_json(path, slug) do
+      {:ok, json_path, private?} ->
         json_data = json_path |> File.read!() |> Jason.decode!()
         title = json_data["title"] || slug
         id = Ecto.UUID.generate()
@@ -32,7 +32,9 @@ defmodule ToscaniniWeb.AnnotateController do
           content_type: "podcast_episode",
           collector: "reannotate",
           status: "queued",
-          params: Jason.encode!(%{"auto_annotate" => true}),
+          # Episódio achado no repositório privado segue privado: o write_files e o
+          # git_commit escrevem de volta no mesmo repositório.
+          params: Jason.encode!(Map.merge(%{"auto_annotate" => true}, if(private?, do: %{"private" => true}, else: %{}))),
           results: initial_results,
           current_step: "summarize"
         })
@@ -54,36 +56,10 @@ defmodule ToscaniniWeb.AnnotateController do
 
   defp slug_of(path) do
     path
+    |> ContentRepos.normalize_path()
     |> String.trim_trailing(".json")
     |> String.trim_trailing(".md")
     |> String.split("/")
     |> List.last()
   end
-
-  # Tenta o path exato primeiro (case-sensitive, formato canônico
-  # YYYY/MM/Wnn/slug); se não existir, cai pra busca por slug
-  # case-insensitive em todo o vox-content, o que cobre URLs públicas
-  # (lowercase) e paths digitados com casing diferente.
-  defp resolve_json_path(vox_content_dir, path, slug) do
-    direct = Path.join(vox_content_dir, Path.rootname(path) <> ".json")
-
-    if File.exists?(direct) do
-      {:ok, direct}
-    else
-      case find_by_slug(vox_content_dir, slug) do
-        nil -> :error
-        found -> {:ok, found}
-      end
-    end
-  end
-
-  defp find_by_slug(vox_content_dir, slug) do
-    target = String.downcase(slug)
-
-    vox_content_dir
-    |> Path.join("**/*.json")
-    |> Path.wildcard()
-    |> Enum.find(fn p -> String.downcase(Path.basename(p, ".json")) == target end)
-  end
 end
-

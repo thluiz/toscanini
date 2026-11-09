@@ -15,7 +15,8 @@ defmodule Toscanini.Workers.RetentionSweepWorker do
   2. No-op se `TOSCANINI_ARCHIVE_BACKLOG_DONE != true` — trava operacional: nunca
      limpa antes de todo o histórico estar confirmado no cold (invariante do plano).
   3. Em `dry_run` (default `true`), só loga os candidatos — não apaga.
-  4. **Nunca apaga sem confirmar o par no S3** (`Archive.object_exists?/1`):
+  4. **Nunca apaga áudio de conteúdo privado** (`metadata.private`).
+  5. **Nunca apaga sem confirmar o par no S3** (`Archive.object_exists?/1`):
      - podcast → `podcasts/<slug>.mp3` (o próprio mp3 no cold)
      - youtube → `youtube/<slug>.txt` (transcrição; o áudio local é re-baixável)
   """
@@ -67,7 +68,23 @@ defmodule Toscanini.Workers.RetentionSweepWorker do
     :ok
   end
 
-  defp process(jf, dir, cutoff, dry, {del, freed, kept, expired}) do
+  # Conteúdo privado (`metadata.private` no sidecar, gravado na ingestão) nunca
+  # perde o áudio local: o MP3 é a fonte para cortar trechos e mandar ao Mesa.
+  defp process(jf, dir, cutoff, dry, acc) do
+    if private?(jf), do: acc, else: do_process(jf, dir, cutoff, dry, acc)
+  end
+
+  @doc false
+  def private?(jf) do
+    with {:ok, body} <- File.read(jf),
+         {:ok, data} <- Jason.decode(body) do
+      get_in(data, ["metadata", "private"]) == true
+    else
+      _ -> false
+    end
+  end
+
+  defp do_process(jf, dir, cutoff, dry, {del, freed, kept, expired}) do
     slug = Path.basename(jf, ".json")
 
     {audio, key} =

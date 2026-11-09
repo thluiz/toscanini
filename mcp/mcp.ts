@@ -61,6 +61,10 @@ const TOOLS = [
           type: "boolean",
           description: "Force re-transcription even if transcript already exists",
         },
+        private: {
+          type: "boolean",
+          description: "Private content: written to vox-private-content, never to the public vox-content",
+        },
       },
       required: ["url"],
     },
@@ -85,6 +89,10 @@ const TOOLS = [
         force_retranscribe: {
           type: "boolean",
           description: "Force re-transcription for all episodes",
+        },
+        private: {
+          type: "boolean",
+          description: "Private content: written to vox-private-content, never to the public vox-content",
         },
       },
       required: ["urls"],
@@ -518,6 +526,7 @@ async function dispatch(
           const body: Record<string, unknown> = { url: args.url };
           if (args.collector) body.collector = args.collector;
           if (args.force_retranscribe !== undefined) body.force_retranscribe = args.force_retranscribe;
+          if (args.private !== undefined) body.private = args.private;
           resultData = await toscaniniPost(base, "/jobs", body);
 
         } else if (toolName === "submit_batch") {
@@ -528,6 +537,7 @@ async function dispatch(
           const body: Record<string, unknown> = { urls: urls.join(",") };
           if (args.collector) body.collector = args.collector;
           if (args.force_retranscribe !== undefined) body.force_retranscribe = args.force_retranscribe;
+          if (args.private !== undefined) body.private = args.private;
           resultData = await toscaniniPost(base, "/batch", body);
 
         } else if (toolName === "get_job") {

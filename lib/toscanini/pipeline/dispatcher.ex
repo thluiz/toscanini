@@ -19,8 +19,6 @@ defmodule Toscanini.Pipeline.Dispatcher do
     "scholion_synthesize" => {:scholion_write,      Workers.ScholionWriteWorker,        :default},
     "scholion_write"      => {:scholion_commit,     Workers.ScholionCommitWorker,       :git_commit},
     "scholion_commit"     => {:notify,              Workers.NotifyWorker,               :default},
-    "verify_url"    => {:facebook_cache_refresh,  Workers.FacebookCacheRefreshWorker,   :default},
-    "facebook_cache_refresh" => {:notify,         Workers.NotifyWorker,                 :default},
     "notify"        => :done
   }
 
@@ -37,16 +35,6 @@ defmodule Toscanini.Pipeline.Dispatcher do
       nil ->
         {:error, "unknown step: #{pipeline.current_step}"}
     end
-  end
-
-  defp enqueue(pipeline, :facebook_cache_refresh, worker, queue) do
-    delay = Application.get_env(:toscanini, :facebook_cache_refresh_delay, 120)
-    pipeline
-    |> Pipeline.changeset(%{current_step: "facebook_cache_refresh", status: "running"})
-    |> Repo.update!()
-    worker.new(%{"pipeline_id" => pipeline.id}, queue: queue, schedule_in: delay)
-    |> Oban.insert!()
-    :ok
   end
 
   defp enqueue(pipeline, step, worker, queue) do

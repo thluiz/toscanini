@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.2.37] — 2026-11-09
+
+### Modo privado completo no Toscanini; remove os passos de verificação de URL e Facebook
+
+Fecha as pontas soltas do pipeline privado (v0.2.34) para as ferramentas que já usamos
+no Vox continuarem valendo sobre o material privado: o conteúdo usa o mesmo formato
+do Vox (`YYYY/MM/Wnn/<slug>.md` + `.json`), só com outra raiz.
+
+- **`ContentRepos`** (novo) — as duas raízes (`TOSCANINI_VOX_CONTENT_DIR` e, se definida,
+  `TOSCANINI_VOX_PRIVATE_DIR`) e a localização de um episódio por path ou slug; aceita o
+  prefixo `privado/<token>/` do site privado e barra final
+- **`POST /annotate`** — procura o episódio nos dois repositórios; o achado no privado
+  gera um pipeline privado, que escreve de volta no repositório privado. Antes só olhava o
+  público e não acharia nada privado
+- **`POST /ingest/local`** — aceita `private: true`: marca o pipeline e o sidecar
+  (`metadata.private`) e ignora reenvio do mesmo slug (os arquivos chegam aos poucos)
+- **`POST /batch`** e as tools `submit_job`/`submit_batch` do MCP — aceitam `private`
+- **`RetentionSweepWorker`** — nunca apaga o áudio local de conteúdo privado: o MP3 é a
+  fonte para cortar trechos e mandar ao Mesa
+- **Removidos** `VerifyUrlWorker`, `FacebookCacheRefreshWorker` e o client do Facebook,
+  só alcançáveis pelo passo `vox_publish` que saiu na v0.2.35, junto com as entradas do
+  dispatcher, `FACEBOOK_APP_TOKEN`/`FACEBOOK_REFRESH_DELAY` (config, unit e README)
+- **Testes** — `ContentRepos`, `RetentionSweepWorker.private?/1`; os controllers foram
+  exercitados de ponta a ponta com banco temporário (18 verificações)
+
 ## [0.2.36] — 2026-11-09
 
 ### Whisper só pega a GPU com 5,2 GB de VRAM livres; modelo de janelas 10h–21h

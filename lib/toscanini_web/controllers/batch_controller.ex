@@ -18,7 +18,9 @@ defmodule ToscaniniWeb.BatchController do
       |> json(%{error: "urls is required and must not be empty"})
     else
       collector    = params["collector"] || "pocketcasts"
-      extra_params = %{"force_retranscribe" => params["force_retranscribe"] || false}
+      extra_params =
+        %{"force_retranscribe" => params["force_retranscribe"] || false}
+        |> then(fn p -> if params["private"] in [true, "true"], do: Map.put(p, "private", true), else: p end)
 
       {:ok, batch, pipeline_id} = Batches.start_batch(urls, collector, extra_params)
 

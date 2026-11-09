@@ -41,14 +41,6 @@ config :toscanini, :vox_base_url,
 config :toscanini, :scholion_base_url,
   System.get_env("SCHOLION_BASE_URL", "https://scholion.thluiz.com")
 
-# Token da app do Facebook (formato APP_ID|APP_SECRET) para recrawl de previews
-config :toscanini, :facebook_app_token,
-  System.get_env("FACEBOOK_APP_TOKEN", "")
-
-# Segundos a aguardar após vox_publish antes de chamar o Facebook (CDN delay)
-config :toscanini, :facebook_cache_refresh_delay,
-  System.get_env("FACEBOOK_REFRESH_DELAY", "120") |> String.to_integer()
-
 # Arquivamento em cold storage (S3). Desligado por padrão — o passo s3_archive é
 # no-op até TOSCANINI_ARCHIVE_ENABLED=true E um bucket configurado. Ver
 # Toscanini.Archive / Toscanini.Workers.S3ArchiveWorker.

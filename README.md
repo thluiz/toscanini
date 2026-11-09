@@ -168,8 +168,6 @@ The `toscanini-mcp/` directory contains a TypeScript MCP server exposing all orc
 | `GOSSIPGATE_API_KEY` | — | GossipGate notification key |
 | `GOSSIPGATE_TARGET` | `toscanini` | GossipGate named destination (Telegram chat) |
 | `VOX_BASE_URL` | `https://vox.thluiz.com` | Public site URL for verification |
-| `FACEBOOK_APP_TOKEN` | — | `APP_ID\|APP_SECRET` for og: refresh |
-| `FACEBOOK_REFRESH_DELAY` | `120` | Seconds to wait before Facebook cache refresh |
 
 ## Running
 
