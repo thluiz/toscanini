@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.2.35] — 2026-11-09
+
+### Remove o passo `vox_publish` (código morto do tempo do Quartz + Azure)
+
+O Vox hoje é Hugo + S3 + CloudFront, publicado pelo `vox-publish-windows.ps1` (a
+cada hora, no Windows, a partir do que foi empurrado para o `vox-content`). O
+Toscanini não publica o site: o fluxo termina em `git_commit → s3_archive → notify`.
+O `VoxPublishWorker` ainda chamava o `vox-publish` antigo do HermesTools
+(Quartz + Azure Static Web Apps), que já foi removido do host, e nenhum passo o
+enfileirava desde que o `GitCommitWorker` passou a avançar para o `s3_archive`.
+
+- **`VoxPublishWorker`** removido, junto com a entrada `"vox_publish"` do dispatcher
+  e a fila `vox_publish` do Oban (`config.exs`); `Oban.Config.new/1` validado
+- **`deploy/toscanini.service`** — sai `TOSCANINI_VOX_PUBLISH_BIN`
+- **README** — diagrama corrigido (inclui `AnnotateWorker` e `S3ArchiveWorker`, sem
+  `VoxPublish`/`VerifyUrl`/`FacebookCacheRefresh`), explica que o site é publicado
+  fora do Toscanini; saem a variável e a fila removidas
+- Não tocados: `VerifyUrlWorker` e `FacebookCacheRefreshWorker` seguem no código,
+  mas só eram alcançáveis pelo passo removido (hoje sem uso)
+
 ## [0.2.34] — 2026-11-09
 
 ### Base do pipeline privado: conteúdo no repo git privado, sem URL pública

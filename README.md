@@ -31,6 +31,9 @@ POST /api/orchestrator/jobs { "url": "https://pca.st/episode/..." }
   SummarizeWorker         ← calls vox-intelligence with transcript + metadata
         │
         ▼
+  AnnotateWorker          ← auto-annotation (only for feeds with auto_annotate)
+        │
+        ▼
   EnrichTagsWorker        ← adds participants, podcast name, categories as kebab tags
         │
         ▼
@@ -40,17 +43,15 @@ POST /api/orchestrator/jobs { "url": "https://pca.st/episode/..." }
   GitCommitWorker         ← commits .json + .md to vox-content repo
         │
         ▼
-  VoxPublishWorker        ← runs vox-publish (Quartz build + S3 deploy)
-        │
-        ▼
-  VerifyUrlWorker         ← confirms article is live at vox.thluiz.com
-        │
-        ▼
-FacebookCacheRefreshWorker ← POST to Graph API to refresh og:tags
+  S3ArchiveWorker         ← archives audio/transcript to cold storage (no-op when disabled)
         │
         ▼
    NotifyWorker           ← sends Telegram notification via GossipGate
 ```
+
+Toscanini does not publish the site. The Vox site (Hugo + S3 + CloudFront) is built and
+deployed by `vox-publish-windows.ps1` in the `vox` repo, which runs hourly on Windows and
+picks up whatever was pushed to `vox-content`.
 
 All inter-service HTTP calls use `HERMES_BASE_URL` (nginx gateway — never direct ports).
 
@@ -160,7 +161,6 @@ The `toscanini-mcp/` directory contains a TypeScript MCP server exposing all orc
 | `WHISPER_WORKER_PATH` | — | Path to `whisper_worker.py` |
 | `WHISPER_LD_LIBRARY_PATH` | — | CUDA/cuDNN library paths |
 | `TOSCANINI_VOX_CONTENT_DIR` | — | vox-content git repo path |
-| `TOSCANINI_VOX_PUBLISH_BIN` | — | vox-publish script path |
 | `TOSCANINI_COLLECTED_DIR` | `/home/hermes/collected` | Downloaded MP3 storage |
 | `TOSCANINI_DB_PATH` | `data/orchestrator.db` | SQLite database path |
 | `GOSSIPGATE_API_KEY` | — | GossipGate notification key |
@@ -199,7 +199,6 @@ SQLite at `data/orchestrator.db`. Key tables:
 | `collectors` | 3 | Parallel episode scraping |
 | `transcribe` | 2 | Controlled by scheduler config |
 | `git_commit` | 1 | Sequential (avoid conflicts) |
-| `vox_publish` | 1 | Sequential (Quartz builds) |
 | `default` | 5 | Summarize, enrich, notify, etc. |
 
 ## Security TODO

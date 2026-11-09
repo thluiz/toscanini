@@ -30,7 +30,6 @@ Environment=TOSCANINI_VOX_CONTENT_DIR=/home/hermes/vox-content
 Environment=TOSCANINI_SCHOLION_DIR=/home/hermes/scholion
 # URL pública do Scholion (link nas notificações). Default no runtime.exs.
 # Environment=SCHOLION_BASE_URL=https://scholion.thluiz.com
-Environment=TOSCANINI_VOX_PUBLISH_BIN=/home/hermes/.local/bin/vox-publish
 Environment=GOSSIPGATE_API_KEY=<REDACTED:GOSSIPGATE_API_KEY>
 Environment=VOX_BASE_URL=https://vox.thluiz.com
 Environment=FACEBOOK_APP_TOKEN=<REDACTED:FACEBOOK_APP_TOKEN>
