@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.2.40] — 2026-11-09
+
+### Telegram: o aviso de episódio privado leva o link do site privado
+
+O aviso do pipeline para conteúdo privado saía sem URL. O Telegram é particular, então agora leva o
+link `https://vox.thluiz.com/privado/<guid>/<ano>/<mês>/W<semana>/<slug>/`, tanto na mensagem padrão
+quanto na lista de anotações novas.
+
+- **`PrivateSite`** (novo) — monta a URL; o guid vem de `TOSCANINI_VOX_PRIVATE_GUID` (no unit do systemd,
+  como as outras chaves; nunca no código nem no git). Sem a variável, não há link e a mensagem sai igual
+- **`NotifyWorker`** — `episode_url/3`; `build_message` recebe a URL pronta. Para episódio público a
+  mensagem não muda
+- A página só existe depois do próximo publish do Vox privado (a tarefa roda a cada 15 min); o publish
+  também manda ao Telegram um aviso com os links dos episódios novos, já no ar
+- Testes de `PrivateSite`; a notificação foi exercitada de ponta a ponta com um GossipGate falso (6 verificações)
+
 ## [0.2.39] — 2026-11-09
 
 ### ingest-private: slug sem repetir o curso, título legível e `--title`

@@ -96,7 +96,7 @@ defmodule Toscanini.Workers.NotifyWorker do
     duration    = get_in(json_data, ["metadata", "duration"]) || ""
     description = json_data["description"] || ""
     timeline    = json_data["timeline"] || []
-    # Privado: sem URL pública (o repo privado não é servido); só o path.
+    # Privado: o link é o do site privado (com o guid), se TOSCANINI_VOX_PRIVATE_GUID estiver definido.
     vox_path    = write_files["vox_path"]
     private?    = Pipeline.private?(pipeline)
     new_annotations = annotate["new"] || []
@@ -107,14 +107,14 @@ defmodule Toscanini.Workers.NotifyWorker do
       # Anotação (backlog manual ou feed auto_annotate): manda a lista das
       # anotações novas — com resumo — dividida em quantas mensagens forem
       # necessárias pro limite do Telegram, com a URL completa só na última.
-      url = if private?, do: nil, else: build_url(vox_path, vox_base_url)
+      url = episode_url(private?, vox_path, vox_base_url)
 
       new_annotations
       |> build_annotation_messages(title, podcast, duration, url)
       |> Enum.each(&GossipGate.send/1)
     else
       msg =
-        build_message(title, podcast, duration, description, timeline, vox_path, vox_base_url, private?)
+        build_message(title, podcast, duration, description, timeline, vox_path, episode_url(private?, vox_path, vox_base_url))
       GossipGate.send(msg)
     end
 
@@ -144,6 +144,11 @@ defmodule Toscanini.Workers.NotifyWorker do
 
   defp build_url(vox_path, base),
     do: "#{String.trim_trailing(base, "/")}/#{String.replace_suffix(vox_path, ".md", "")}"
+
+  # Público: URL do Vox. Privado: URL do site privado (o guid é a credencial; o Telegram é particular),
+  # ou nil se o guid não estiver configurado.
+  defp episode_url(true, vox_path, base), do: Toscanini.PrivateSite.url(vox_path, base)
+  defp episode_url(false, vox_path, base), do: build_url(vox_path, base)
 
   # ---- Mensagem de anotações (nova) ------------------------------------------
 
@@ -224,7 +229,7 @@ defmodule Toscanini.Workers.NotifyWorker do
 
   # ---- Mensagem padrão (sem anotações novas — comportamento original) -------
 
-  defp build_message(title, podcast, duration, description, timeline, vox_path, vox_base_url, private?) do
+  defp build_message(title, podcast, duration, description, timeline, vox_path, url) do
     header = """
     ✅ <b>#{escape(title)}</b>
     <i>#{escape(podcast)}#{if duration != "", do: " · #{escape(duration)}", else: ""}</i>
@@ -241,8 +246,7 @@ defmodule Toscanini.Workers.NotifyWorker do
         else: ""
 
     url_block =
-      if vox_path && !private? do
-        url = "#{vox_base_url}/#{String.replace_suffix(vox_path, ".md", "")}"
+      if url do
         "\n🔗 <a href=\"#{url}\">#{escape(url)}</a>\n"
       else
         ""
