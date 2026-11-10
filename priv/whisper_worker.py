@@ -177,7 +177,7 @@ def gpu_cooldown_active(now_ts=None):
 SLOT_POLL_SECS = 5
 # O large-v3 float16 ocupa ~5 GB dos 6 GB da RTX 3050: com menos que isto livre
 # (algo mais usando a GPU), ele cai com CUDA out of memory. Em MiB, como o nvidia-smi.
-MIN_FREE_VRAM_MB = int(os.environ.get("WHISPER_MIN_FREE_VRAM_MB", "5200"))
+MIN_FREE_VRAM_MB = int(os.environ.get("WHISPER_MIN_FREE_VRAM_MB", "4600"))
 VRAM_WAIT_SECS = int(os.environ.get("WHISPER_VRAM_WAIT_SECS", "20"))
 
 

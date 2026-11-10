@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.41] — 2026-11-10
+
+### Whisper: VRAM mínima para a GPU cai de 5200 para 4600 MiB
+
+Com o Windows (dwm do RDP + sessão Console) ocupando ~1,2 GB da RTX 3050, a placa nunca chegava a 5200 MiB
+livres e tudo ia para a CPU. O piso passa a 4600 MiB (`WHISPER_MIN_FREE_VRAM_MB`, padrão em `priv/whisper_worker.py`).
+Se o large-v3 cair por falta de memória, o cooldown de 15 min (exit 134) continua protegendo.
+
 ## [0.2.40] — 2026-11-09
 
 ### Telegram: o aviso de episódio privado leva o link do site privado

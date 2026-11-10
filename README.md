@@ -103,8 +103,8 @@ Toscanini runs **faster-whisper** locally via `priv/whisper_worker.py`. Model se
 
 | Condition | Model | Device | Compute |
 |-----------|-------|--------|---------|
-| GPU allowed by scheduler + lock acquired + at least 5200 MiB of VRAM free | large-v3 | CUDA | float16 |
-| GPU unavailable, not allowed or with less than 5200 MiB of VRAM free | large-v3 | CPU | int8 |
+| GPU allowed by scheduler + lock acquired + at least 4600 MiB of VRAM free | large-v3 | CUDA | float16 |
+| GPU unavailable, not allowed or with less than 4600 MiB of VRAM free | large-v3 | CPU | int8 |
 | GPU cooldown open (whisper aborted on the GPU in the last 15 min) | large-v3 | CPU | int8 |
 | OOM during GPU transcription | large-v3 | CPU | int8 (auto-fallback, when Python catches it) |
 
@@ -128,7 +128,7 @@ The scheduler controls concurrency, GPU access, and CPU thread count per time wi
 
 GPU access is serialized via `/tmp/whisper-gpu.lock` (PID-based, with stale lock detection).
 
-**VRAM check.** large-v3 float16 uses ~5 GB of the 6 GB card, so anything else on the GPU makes it die with `CUDA out of memory`. After taking the GPU lock the worker waits up to 20 s for the previous job to release its VRAM, and if less than `WHISPER_MIN_FREE_VRAM_MB` (default 5200) is free it releases the lock and goes to the CPU instead of starting just to crash. `WHISPER_VRAM_WAIT_SECS` changes the grace period.
+**VRAM check.** large-v3 float16 uses ~5 GB of the 6 GB card, so anything else on the GPU makes it die with `CUDA out of memory`. After taking the GPU lock the worker waits up to 20 s for the previous job to release its VRAM, and if less than `WHISPER_MIN_FREE_VRAM_MB` (default 4600) is free it releases the lock and goes to the CPU instead of starting just to crash. `WHISPER_VRAM_WAIT_SECS` changes the grace period.
 
 **GPU cooldown.** When the whisper process dies on the GPU with exit 134 (`CUDA failed with error out of memory` aborts the whole process, so the Python fallback never runs), `TranscribeWorker` writes `data/gpu_cooldown.json` and snoozes the job instead of spending an attempt. For the next 15 minutes `whisper_worker.py` sends every job to the CPU; after that the next job tries the GPU again.
 
