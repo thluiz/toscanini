@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { buildPayload, episodeSlug, formatDuration, slugify, titleFromFilename } from "./ingest-private-lib";
+import { buildPayload, episodeSlug, formatDuration, parseTags, slugify, titleFromFilename } from "./ingest-private-lib";
 
 describe("slugify", () => {
   test("tira acento, pontuação e espaços", () => {
@@ -88,5 +88,21 @@ describe("buildPayload", () => {
 
   test("autor só entra quando informado", () => {
     expect(buildPayload({ ...base, author: "Thiago Silva" }).json.metadata.author).toBe("Thiago Silva");
+  });
+
+  test("tags de agrupamento vão em metadata.user_tags, como slug e sem repetir", () => {
+    const p = buildPayload({ ...base, tags: ["Aulas 2026, Ética", "etica"] });
+    expect(p.json.metadata.user_tags).toEqual(["aulas-2026", "etica"]);
+  });
+
+  test("sem tags, a chave nem existe", () => {
+    expect(buildPayload(base).json.metadata.user_tags).toBeUndefined();
+    expect(buildPayload({ ...base, tags: ["", " , "] }).json.metadata.user_tags).toBeUndefined();
+  });
+});
+
+describe("parseTags", () => {
+  test("vírgulas, acentos e repetição", () => {
+    expect(parseTags(["Filosofia Política, Ética", "ética", "  "])).toEqual(["filosofia-politica", "etica"]);
   });
 });

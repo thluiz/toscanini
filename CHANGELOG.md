@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.2.42] — 2026-11-10
+
+### Ingestão privada: `--tag` para agrupar episódios + skill `/vox-ingest-private`
+
+O resumo do LLM sobrescreve `tags` no sidecar, então a tag pedida na ingestão viaja em `metadata.user_tags` e o
+passo `enrich_tags` a acrescenta às `tags` do episódio (em slug, sem repetir). No Vox, o Hugo já tem a taxonomia
+`tags`: os episódios aparecem juntos em `/tags/<tag>/`.
+
+- **`scripts/ingest-private.ts`** — `--tag grupo` (repete ou usa vírgula); `parseTags` em `ingest-private-lib.ts`.
+- **`EnrichTagsWorker`** — `user_tags/1` e `new_tags/3` (públicas, testadas). Vale só para episódios novos: um slug já enviado
+  devolve `duplicate` e não recebe tag. Precisa de restart do Toscanini para entrar em vigor.
+- **Skill `/vox-ingest-private`** (em `~/.claude/skills`) — recebe arquivo ou pasta, pergunta o curso, ensaia com `--dry-run`,
+  envia e relata. Testes: 16 em `scripts/` e 130 em `test/toscanini`.
+
 ## [0.2.41] — 2026-11-10
 
 ### Whisper: VRAM mínima para a GPU cai de 5200 para 4600 MiB

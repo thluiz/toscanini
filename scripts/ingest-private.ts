@@ -2,9 +2,10 @@
 /**
  * Envia MP3 de cursos/aulas para o Toscanini como conteúdo PRIVADO.
  *
- *   bun scripts/ingest-private.ts --course "Nome do Curso" [--author "Nome"] [--title "Título"] [--dry-run] <arquivo-ou-pasta>...
+ *   bun scripts/ingest-private.ts --course "Nome do Curso" [--author "Nome"] [--title "Título"] [--tag grupo]... [--dry-run] <arquivo-ou-pasta>...
  *
  * --title (só com um arquivo) substitui o título tirado do nome do arquivo.
+ * --tag agrupa episódios no Vox (página /tags/<tag>/): pode repetir ou separar por vírgula; vira slug.
  *
  * Para cada MP3: copia para /home/hermes/collected (HermesTools) com o slug "<curso>-<arquivo>",
  * mede a duração com o ffprobe de lá e chama POST /ingest/local com private: true. O pipeline
@@ -15,7 +16,7 @@
  */
 import { readdirSync, statSync } from "node:fs";
 import { basename, join } from "node:path";
-import { buildPayload, episodeSlug } from "./ingest-private-lib";
+import { buildPayload, episodeSlug, parseTags } from "./ingest-private-lib";
 
 const DISTRO = ["-d", "HermesTools", "-u", "hermes"];
 const COLLECTED = "/home/hermes/collected";
@@ -27,12 +28,13 @@ const opt = (name: string) => {
   const i = args.indexOf(name);
   return i >= 0 ? args[i + 1] : undefined;
 };
-const valueFlags = new Set(["--course", "--author", "--title"]);
+const valueFlags = new Set(["--course", "--author", "--title", "--tag"]);
 const paths = args.filter((a, i) => !a.startsWith("--") && !valueFlags.has(args[i - 1] ?? ""));
 
 const course = opt("--course");
 const author = opt("--author");
 const title = opt("--title");
+const tags = parseTags(args.flatMap((a, i) => (a === "--tag" && args[i + 1] ? [args[i + 1]] : [])));
 const dryRun = flag("--dry-run");
 
 if (title && paths.length !== 1) {
@@ -41,7 +43,7 @@ if (title && paths.length !== 1) {
 }
 
 if (!course || paths.length === 0) {
-  console.error('uso: bun scripts/ingest-private.ts --course "Nome do Curso" [--author "Nome"] [--title "Título"] [--dry-run] <arquivo-ou-pasta>...');
+  console.error('uso: bun scripts/ingest-private.ts --course "Nome do Curso" [--author "Nome"] [--title "Título"] [--tag grupo]... [--dry-run] <arquivo-ou-pasta>...');
   process.exit(2);
 }
 
@@ -67,7 +69,7 @@ if (files.length === 0) {
   process.exit(1);
 }
 
-console.error(`${files.length} arquivo(s) do curso "${course}"${dryRun ? " (dry-run: nada será copiado nem enviado)" : ""}`);
+console.error(`${files.length} arquivo(s) do curso "${course}"${tags.length ? ` [tags: ${tags.join(", ")}]` : ""}${dryRun ? " (dry-run: nada será copiado nem enviado)" : ""}`);
 
 const results = { queued: 0, duplicate: 0, failed: 0 };
 
@@ -100,6 +102,7 @@ for (const file of files) {
       durationSecs,
       publishedIso: statSync(file).mtime.toISOString().slice(0, 10),
       author,
+      tags,
       uuid: crypto.randomUUID(),
     });
 

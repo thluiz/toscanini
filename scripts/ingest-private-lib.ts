@@ -38,6 +38,16 @@ export function episodeSlug(course: string, filename: string): string {
   return [prefix, fileSlug].filter(Boolean).join("-");
 }
 
+/** ["Aulas 2026, Ética", "etica"] -> ["aulas-2026", "etica"]: aceita vírgulas, vira slug, sem repetição. */
+export function parseTags(raw: string[]): string[] {
+  const out: string[] = [];
+  for (const piece of raw.flatMap((r) => r.split(","))) {
+    const t = slugify(piece);
+    if (t && !out.includes(t)) out.push(t);
+  }
+  return out;
+}
+
 /** 3725 -> "01:02:05" */
 export function formatDuration(totalSecs: number): string {
   const s = Math.max(0, Math.round(totalSecs));
@@ -67,6 +77,8 @@ export function buildPayload(opts: {
   durationSecs: number;
   publishedIso: string;
   author?: string;
+  /** Tags de agrupamento pedidas pelo usuário (viram `tags` no Vox via enrich_tags). */
+  tags?: string[];
   uuid: string;
 }): IngestPayload {
   const title = opts.title?.trim() || titleFromFilename(opts.filename);
@@ -80,6 +92,8 @@ export function buildPayload(opts: {
     source_url: "",
   };
   if (opts.author) metadata.author = opts.author;
+  const userTags = parseTags(opts.tags ?? []);
+  if (userTags.length > 0) metadata.user_tags = userTags;
   return {
     slug: episodeSlug(opts.course, opts.filename),
     duration_secs: Math.round(opts.durationSecs),
