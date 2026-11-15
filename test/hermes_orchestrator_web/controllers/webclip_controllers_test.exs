@@ -1,7 +1,17 @@
 defmodule ToscaniniWeb.WebclipControllersTest do
-  use ToscaniniWeb.ConnCase, async: false
+  # ConnCase pulls ToscaniniWeb.verified_routes/0, which this app doesn't
+  # define — so the sandbox + ConnTest are set up by hand.
+  use Toscanini.DataCase, async: false
+  import Plug.Conn
+  import Phoenix.ConnTest
+
+  @endpoint ToscaniniWeb.Endpoint
 
   alias Toscanini.{Repo, Pipeline}
+
+  setup do
+    {:ok, conn: build_conn() |> put_req_header("accept", "application/json")}
+  end
 
   describe "POST /api/orchestrator/publish/webclip" do
     test "rejects a missing or non-http url", %{conn: conn} do
