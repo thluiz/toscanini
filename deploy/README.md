@@ -83,3 +83,20 @@ O `vox-intelligence` precisa do preset `quote-note` (síntese) e do `ghost-audit
 (portão de voz) — ambos usam `OPENROUTER_API_KEY` (Perplexity para autoria +
 modelos de composição). Nenhuma chave git vive no código do Toscanini: a auth é
 resolvida pelo remote do clone via `~/.ssh/config`.
+
+## Publish webclip (`POST /api/orchestrator/publish/webclip`)
+
+The webclip flow calls the scholion-webclipper (`$HERMES_BASE_URL/api/webclip/`)
+as its own principal. One-time setup:
+
+1. In `/home/hermes/services/scholion-webclipper/acl.json`, add a `toscanini`
+   principal with role `write` and a fresh key (`openssl rand -hex 24`). Never
+   `admin`: the flow must not be able to force a save past a red ghost-audit.
+2. Put the same key in the unit as `WEBCLIPPER_API_KEY`, then
+   `systemctl daemon-reload && systemctl restart toscanini`.
+
+Saves use `mode: "commit"`: the webclipper writes and pushes from its own
+clone (`scholion-webclipper/vault`), not from `TOSCANINI_SCHOLION_DIR`.
+Pipelines the server can't finish are `parked`; Claude Code on the author's
+machine works the queue through the MCP tools `list_parked` /
+`resume_parked` / `dismiss_parked`.

@@ -55,12 +55,23 @@ defmodule Toscanini.Webclip do
     detail = %{"code" => code, "message" => error["message"]}
 
     cond do
-      code in @park_for_browser -> {:park, "browser", detail}
-      code in @retry_then_browser and last_attempt? -> {:park, "browser", detail}
-      code in @retry_then_browser -> :retry
-      code in @retry_then_fail and last_attempt? -> {:fail, "webclipper #{code}: #{error["message"]}"}
-      code in @retry_then_fail -> :retry
-      true -> {:fail, "webclipper #{code}: #{error["message"]}"}
+      code in @park_for_browser ->
+        {:park, "browser", detail}
+
+      code in @retry_then_browser and last_attempt? ->
+        {:park, "browser", detail}
+
+      code in @retry_then_browser ->
+        :retry
+
+      code in @retry_then_fail and last_attempt? ->
+        {:fail, "webclipper #{code}: #{error["message"]}"}
+
+      code in @retry_then_fail ->
+        :retry
+
+      true ->
+        {:fail, "webclipper #{code}: #{error["message"]}"}
     end
   end
 
@@ -93,7 +104,9 @@ defmodule Toscanini.Webclip do
   end
 
   def classify_save({:error, _reason}, false), do: :retry
-  def classify_save({:error, reason}, true), do: {:fail, "webclipper unreachable on save: #{reason}"}
+
+  def classify_save({:error, reason}, true),
+    do: {:fail, "webclipper unreachable on save: #{reason}"}
 
   defp audit_unavailable?(audit) do
     String.starts_with?(to_string(audit["summary"]), "ghost-audit unavailable")
@@ -153,6 +166,8 @@ defmodule Toscanini.Webclip do
 
   def normalize_quotes(_), do: []
 
-  defp blank_to(v, fallback) when is_binary(v), do: if(String.trim(v) == "", do: fallback, else: v)
+  defp blank_to(v, fallback) when is_binary(v),
+    do: if(String.trim(v) == "", do: fallback, else: v)
+
   defp blank_to(_, fallback), do: fallback
 end

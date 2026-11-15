@@ -4,7 +4,9 @@ defmodule Toscanini.WebclipTest do
   alias Toscanini.Webclip
 
   defp op(audit), do: {:ok, %{"operationId" => "op1", "audit" => audit}}
-  defp api(code, retryable \\ false), do: {:api_error, %{"code" => code, "message" => "m", "retryable" => retryable}}
+
+  defp api(code, retryable \\ false),
+    do: {:api_error, %{"code" => code, "message" => "m", "retryable" => retryable}}
 
   describe "classify_compose/2" do
     test "green and yellow go on to save" do
@@ -20,7 +22,11 @@ defmodule Toscanini.WebclipTest do
     end
 
     test "unavailable audit retries, then parks on the last attempt" do
-      audit = %{"verdict" => "yellow", "summary" => "ghost-audit unavailable, proceeding unaudited (fail-open): timeout"}
+      audit = %{
+        "verdict" => "yellow",
+        "summary" => "ghost-audit unavailable, proceeding unaudited (fail-open): timeout"
+      }
+
       assert Webclip.classify_compose(op(audit), false) == :retry
       assert {:park, "audit_unavailable", _} = Webclip.classify_compose(op(audit), true)
     end
@@ -82,19 +88,33 @@ defmodule Toscanini.WebclipTest do
     end
 
     test "text mode when resumed with page text" do
-      body = Webclip.compose_body(%{"url" => "https://www.nytimes.com/x"}, %{"text" => "corpo", "title" => "T"})
+      body =
+        Webclip.compose_body(%{"url" => "https://www.nytimes.com/x"}, %{
+          "text" => "corpo",
+          "title" => "T"
+        })
 
-      assert body == %{"text" => "corpo", "title" => "T", "url" => "https://www.nytimes.com/x", "domain" => "nytimes-com"}
+      assert body == %{
+               "text" => "corpo",
+               "title" => "T",
+               "url" => "https://www.nytimes.com/x",
+               "domain" => "nytimes-com"
+             }
     end
 
     test "text mode without a title falls back to the URL" do
-      body = Webclip.compose_body(%{"url" => "https://a.com/x"}, %{"text" => "corpo", "title" => " "})
+      body =
+        Webclip.compose_body(%{"url" => "https://a.com/x"}, %{"text" => "corpo", "title" => " "})
+
       assert body["title"] == "https://a.com/x"
     end
 
     test "related notes go along in either mode" do
       notes = [%{"slug" => "s", "title" => "t"}]
-      assert Webclip.compose_body(%{"url" => "https://a.com"}, %{"related_notes" => notes})["relatedNotes"] == notes
+
+      assert Webclip.compose_body(%{"url" => "https://a.com"}, %{"related_notes" => notes})[
+               "relatedNotes"
+             ] == notes
     end
   end
 

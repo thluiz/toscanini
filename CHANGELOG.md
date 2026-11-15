@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.2.43] — 2026-11-15
+
+### Webclip no Toscanini (`POST /publish/webclip`) e fila de pipelines estacionados (`/parked`)
+
+O fluxo de webclip sai das skills e passa a ser um pipeline do Toscanini. Qualquer agente (o Claudinho ou
+quem o substituir) só faz um POST com a URL; retentativa, fallback de navegador, citações e aviso são passos
+do pipeline. O webclipper continua sendo só o serviço de fetch, compose e save.
+
+- **`POST /api/orchestrator/publish/webclip`** — `{url, quotes?, comment?}`. Cria um pipeline `scholion_webclip`:
+  `webclip_compose → webclip_save → webclip_quotes → notify`. A mesma URL já feita, em andamento ou estacionada
+  devolve o job existente (`duplicate: true`).
+- **Estado `parked`** (`Pipeline.park/3`) — o que o servidor sozinho não resolve não falha: espera o Claude Code
+  da máquina do autor. Motivos: `browser` (`blocked_domain`, `consent_wall_unresolved`, `thin_content`, ou
+  `fetch_*` em todas as tentativas), `audit_red`, `audit_unavailable`, `slug_conflict`. Aviso no Telegram
+  ao estacionar. As decisões ficam em `Toscanini.Webclip` (puro, testado).
+- **Fila** — `GET /parked`, `POST /parked/:id/resume` (webclip: `text`/`title` capturados no Chrome e/ou
+  `related_notes`; volta ao compose em modo texto) e `POST /parked/:id/dismiss` (falha como `manual`, fora dos
+  contadores). `Dispatcher.rerun/1` reenfileira o passo atual. `Status` ganha `totals.parked`.
+- **Save em modo `commit`** — o webclipper grava clipping + nota no próprio clone, um commit, e faz push.
+  Autentica como o principal `toscanini` (role `write`, nunca força red): `WEBCLIPPER_API_KEY` no unit.
+- **Citações** — `webclip_quotes` abre um pipeline `scholion_quote` por frase, com a página como fonte.
+  A criação do pipeline de citação foi extraída para `Toscanini.Scholion.QuoteJob` (usada também por
+  `/publish/scholion`).
+- **MCP** — `publish_webclip`, `list_parked`, `resume_parked`, `dismiss_parked`.
+- Testes: 154 (`test/toscanini` + `webclip_controllers_test.exs`). O `ConnCase` continua quebrado
+  (`verified_routes/0` não existe), então o teste de controller monta o `ConnTest` à mão.
+
 ## [0.2.42] — 2026-11-10
 
 ### Ingestão privada: `--tag` para agrupar episódios + skill `/vox-ingest-private`

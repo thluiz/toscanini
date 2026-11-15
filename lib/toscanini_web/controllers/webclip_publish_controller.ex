@@ -36,18 +36,18 @@ defmodule ToscaniniWeb.WebclipPublishController do
     id = Ecto.UUID.generate()
 
     input = %{
-      "url"     => url,
-      "quotes"  => Webclip.normalize_quotes(params["quotes"]),
+      "url" => url,
+      "quotes" => Webclip.normalize_quotes(params["quotes"]),
       "comment" => params["comment"]
     }
 
     Repo.insert!(%Pipeline{
-      id:           id,
+      id: id,
       content_type: "scholion_webclip",
-      collector:    "publish_webclip",
-      status:       "queued",
-      params:       Jason.encode!(%{"url" => url}),
-      results:      Jason.encode!(%{"input" => input}),
+      collector: "publish_webclip",
+      status: "queued",
+      params: Jason.encode!(%{"url" => url}),
+      results: Jason.encode!(%{"input" => input}),
       # advance/1 runs the successor: the first worker is WebclipComposeWorker.
       current_step: "webclip_queued"
     })

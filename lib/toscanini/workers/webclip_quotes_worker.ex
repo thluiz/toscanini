@@ -28,9 +28,9 @@ defmodule Toscanini.Workers.WebclipQuotesWorker do
         |> Webclip.normalize_quotes()
         |> Enum.map(fn quote ->
           QuoteJob.create(%{
-            "quote"      => quote,
+            "quote" => quote,
             "source_url" => url,
-            "context"    => "Trecho da página \"#{title}\" (#{url})."
+            "context" => "Trecho da página \"#{title}\" (#{url})."
           })
         end)
 

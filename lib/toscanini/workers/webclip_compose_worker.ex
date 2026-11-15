@@ -42,16 +42,17 @@ defmodule Toscanini.Workers.WebclipComposeWorker do
 
     Pipeline.save_result(pipeline, "webclip_compose", %{
       "operation_id" => op["operationId"],
-      "expires_at"   => op["expiresAt"],
-      "slug"         => note["slug"],
-      "title"        => note["title"] || clipping["title"],
-      "language"     => note["language"],
-      "url"          => clipping["url"],
-      "clip_title"   => clipping["title"],
-      "verdict"      => audit["verdict"],
-      "findings"     => audit["findings"] || [],
+      "expires_at" => op["expiresAt"],
+      "slug" => note["slug"],
+      "title" => note["title"] || clipping["title"],
+      "language" => note["language"],
+      "url" => clipping["url"],
+      "clip_title" => clipping["title"],
+      "verdict" => audit["verdict"],
+      "findings" => audit["findings"] || [],
       "audit_summary" => audit["summary"],
-      "mode"         => if(get_in(Pipeline.get_results(pipeline), ["resume", "text"]), do: "text", else: "url")
+      "mode" =>
+        if(get_in(Pipeline.get_results(pipeline), ["resume", "text"]), do: "text", else: "url")
     })
 
     Dispatcher.advance(pid)

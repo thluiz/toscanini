@@ -48,7 +48,9 @@ defmodule Toscanini.Clients.Webclipper do
     |> handle()
   end
 
-  defp handle({:ok, %{status: s, body: body}}) when s in 200..299 and is_map(body), do: {:ok, body}
+  defp handle({:ok, %{status: s, body: body}}) when s in 200..299 and is_map(body),
+    do: {:ok, body}
+
   defp handle({:ok, %{body: %{"error" => %{} = error}}}), do: {:api_error, error}
   defp handle({:ok, %{status: s, body: b}}), do: {:error, "webclipper HTTP #{s}: #{inspect(b)}"}
   defp handle({:error, e}), do: {:error, inspect(e)}

@@ -8,10 +8,11 @@ defmodule Toscanini.WebclipFlow do
   alias Toscanini.Clients.GossipGate
 
   @reason_label %{
-    "browser"           => "🅿️ <b>Webclip na fila do Chrome</b> — o servidor não conseguiu ler a página",
-    "audit_red"         => "🛑 <b>Webclip barrado (ghost-audit red)</b> — aguardando revisão local",
-    "audit_unavailable" => "🅿️ <b>Webclip parado</b> — ghost-audit indisponível em todas as tentativas",
-    "slug_conflict"     => "🅿️ <b>Webclip parado</b> — já existe nota com esse slug"
+    "browser" => "🅿️ <b>Webclip na fila do Chrome</b> — o servidor não conseguiu ler a página",
+    "audit_red" => "🛑 <b>Webclip barrado (ghost-audit red)</b> — aguardando revisão local",
+    "audit_unavailable" =>
+      "🅿️ <b>Webclip parado</b> — ghost-audit indisponível em todas as tentativas",
+    "slug_conflict" => "🅿️ <b>Webclip parado</b> — já existe nota com esse slug"
   }
 
   def park(pipeline, reason, detail) do
@@ -22,8 +23,11 @@ defmodule Toscanini.WebclipFlow do
 
     why =
       case {detail["code"], detail["message"]} do
-        {nil, nil} -> ""
-        {code, msg} -> "\n#{escape(to_string(code || reason))}: #{escape(String.slice(to_string(msg), 0, 200))}"
+        {nil, nil} ->
+          ""
+
+        {code, msg} ->
+          "\n#{escape(to_string(code || reason))}: #{escape(String.slice(to_string(msg), 0, 200))}"
       end
 
     GossipGate.send(

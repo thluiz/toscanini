@@ -17,16 +17,17 @@ defmodule Toscanini.Workers.WebclipSaveWorker do
 
     case Webclip.classify_save(outcome, attempt >= max) do
       :ok ->
-        saved = case outcome do
-          {:ok, s} -> s
-          _ -> %{}
-        end
+        saved =
+          case outcome do
+            {:ok, s} -> s
+            _ -> %{}
+          end
 
         Pipeline.save_result(pipeline, "webclip_save", %{
-          "slug"          => saved["slug"],
-          "note_path"     => saved["notePath"],
+          "slug" => saved["slug"],
+          "note_path" => saved["notePath"],
           "clipping_path" => saved["clippingPath"],
-          "commit"        => saved["commit"]
+          "commit" => saved["commit"]
         })
 
         Dispatcher.advance(pid)

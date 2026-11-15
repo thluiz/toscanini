@@ -30,50 +30,57 @@ defmodule ToscaniniWeb.ParkedController do
 
   def resume(conn, %{"id" => id} = params) do
     result =
-    with {:ok, pipeline} <- fetch_parked(id) do
-      results = Pipeline.get_results(pipeline)
+      with {:ok, pipeline} <- fetch_parked(id) do
+        results = Pipeline.get_results(pipeline)
 
-      resume =
-        %{
-          "text"          => params["text"],
-          "title"         => params["title"],
-          "related_notes" => params["related_notes"]
-        }
-        |> Enum.reject(fn {_k, v} -> v in [nil, "", []] end)
-        |> Map.new()
+        resume =
+          %{
+            "text" => params["text"],
+            "title" => params["title"],
+            "related_notes" => params["related_notes"]
+          }
+          |> Enum.reject(fn {_k, v} -> v in [nil, "", []] end)
+          |> Map.new()
 
-      results =
-        results
-        |> Map.put("resume", resume)
-        |> Map.put("last_parked", results["parked"])
-        |> Map.delete("parked")
+        results =
+          results
+          |> Map.put("resume", resume)
+          |> Map.put("last_parked", results["parked"])
+          |> Map.delete("parked")
 
-      # A webclip always resumes at compose: whatever parked it (browser,
-      # red audit, save conflict) needs a fresh operation.
-      step = if pipeline.content_type == "scholion_webclip", do: "webclip_compose", else: pipeline.current_step
+        # A webclip always resumes at compose: whatever parked it (browser,
+        # red audit, save conflict) needs a fresh operation.
+        step =
+          if pipeline.content_type == "scholion_webclip",
+            do: "webclip_compose",
+            else: pipeline.current_step
 
-      pipeline
-      |> Pipeline.changeset(%{results: Jason.encode!(results), current_step: step, status: "running"})
-      |> Repo.update!()
+        pipeline
+        |> Pipeline.changeset(%{
+          results: Jason.encode!(results),
+          current_step: step,
+          status: "running"
+        })
+        |> Repo.update!()
 
-      case Dispatcher.rerun(id) do
-        :ok -> conn |> put_status(202) |> json(%{job_id: id, status: "running", step: step})
-        {:error, reason} -> conn |> put_status(409) |> json(%{error: reason})
+        case Dispatcher.rerun(id) do
+          :ok -> conn |> put_status(202) |> json(%{job_id: id, status: "running", step: step})
+          {:error, reason} -> conn |> put_status(409) |> json(%{error: reason})
+        end
       end
-    end
 
     respond(result, conn)
   end
 
   def dismiss(conn, %{"id" => id} = params) do
     result =
-    with {:ok, pipeline} <- fetch_parked(id) do
-      reason = params["reason"] |> to_string() |> String.trim()
-      reason = if reason == "", do: "no reason given", else: reason
-      # "manual" keeps it out of the failure counters (Toscanini.Status).
-      Pipeline.fail(pipeline, "manual dismiss: #{reason}")
-      json(conn, %{job_id: id, status: "failed", dismissed: true})
-    end
+      with {:ok, pipeline} <- fetch_parked(id) do
+        reason = params["reason"] |> to_string() |> String.trim()
+        reason = if reason == "", do: "no reason given", else: reason
+        # "manual" keeps it out of the failure counters (Toscanini.Status).
+        Pipeline.fail(pipeline, "manual dismiss: #{reason}")
+        json(conn, %{job_id: id, status: "failed", dismissed: true})
+      end
 
     respond(result, conn)
   end
@@ -87,7 +94,9 @@ defmodule ToscaniniWeb.ParkedController do
   end
 
   defp respond(%Plug.Conn{} = done, _conn), do: done
-  defp respond({:error, status, message}, conn), do: conn |> put_status(status) |> json(%{error: message})
+
+  defp respond({:error, status, message}, conn),
+    do: conn |> put_status(status) |> json(%{error: message})
 
   defp summary(p) do
     results = Pipeline.get_results(p)
@@ -95,18 +104,18 @@ defmodule ToscaniniWeb.ParkedController do
     parked = results["parked"] || %{}
 
     %{
-      id:           p.id,
+      id: p.id,
       content_type: p.content_type,
-      url:          input["url"],
-      quotes:       input["quotes"] || [],
-      comment:      input["comment"],
-      reason:       parked["reason"],
-      code:         parked["code"],
-      message:      parked["message"],
-      findings:     parked["findings"] || [],
-      step:         parked["step"],
-      parked_at:    parked["at"],
-      inserted_at:  p.inserted_at
+      url: input["url"],
+      quotes: input["quotes"] || [],
+      comment: input["comment"],
+      reason: parked["reason"],
+      code: parked["code"],
+      message: parked["message"],
+      findings: parked["findings"] || [],
+      step: parked["step"],
+      parked_at: parked["at"],
+      inserted_at: p.inserted_at
     }
   end
 end

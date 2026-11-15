@@ -12,22 +12,22 @@ defmodule Toscanini.Scholion.QuoteJob do
     id = Ecto.UUID.generate()
 
     input = %{
-      "quote"           => quote,
+      "quote" => quote,
       "presumed_author" => input["presumed_author"],
-      "context"         => input["context"],
-      "source_url"      => input["source_url"],
-      "from_book"       => input["from_book"],
+      "context" => input["context"],
+      "source_url" => input["source_url"],
+      "from_book" => input["from_book"],
       # date from the host's real clock (ISO 8601 + offset), as the skill does.
-      "date"            => real_date()
+      "date" => real_date()
     }
 
     Repo.insert!(%Pipeline{
-      id:           id,
+      id: id,
       content_type: "scholion_quote",
-      collector:    "publish_quote",
-      status:       "queued",
-      params:       "{}",
-      results:      Jason.encode!(%{"input" => input}),
+      collector: "publish_quote",
+      status: "queued",
+      params: "{}",
+      results: Jason.encode!(%{"input" => input}),
       # initial marker: advance/1 runs the SUCCESSOR, so the first worker that
       # actually runs is ScholionSynthesizeWorker.
       current_step: "scholion_queued"
