@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.2.44] — 2026-11-15
+
+### `podcast_slug` no frontmatter dos episódios (página `/podcasts/` do Vox)
+
+O Vox ganha a página `/podcasts/` (lista de programas e uma página por programa), montada pelo Hugo como
+taxonomia. O caminho de cada página vinha do nome bruto do podcast e o build roda no Windows: `Scott & Mark
+Learn To...` (ponto final) e um eventual `Nul` (nome reservado) viram pastas inválidas e derrubam o build
+inteiro. A correção é na origem: o renderer grava um slug seguro e o Hugo usa esse campo.
+
+- **`Toscanini.PodcastSlug.slug/1`** — `[a-z0-9-]`, sem acento, apóstrofo não separa palavra (`lennys`),
+  nunca vazio (`podcast-<hash>`), nunca nome reservado do Windows (sufixo `-podcast`), até 80 caracteres.
+  Determinístico: grafias que só diferem em caixa/acento/pontuação caem na mesma página.
+- **Renderer** — `podcast_slug:` logo depois de `podcast:`. Derivado de `metadata.podcast` na renderização;
+  o JSON não muda.
+- Episódios existentes: `.md` regenerados a partir dos JSONs (só a linha nova muda).
+- Testes: `podcast_slug_test.exs` (10) + asserts no `vox_pocketcast_json_renderer_test.exs`. Precisa de restart
+  do Toscanini para entrar em vigor.
+
 ## [0.2.43] — 2026-11-15
 
 ### Webclip no Toscanini (`POST /publish/webclip`) e fila de pipelines estacionados (`/parked`)

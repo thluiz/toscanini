@@ -43,6 +43,9 @@ defmodule Toscanini.VoxPocketcastJsonRenderer do
         "aliases"      => json_map["aliases"],
         "participants" => json_map["participants"],
         "podcast"      => metadata["podcast"],
+        # URL /podcasts/<slug>/ no Vox (taxonomia Hugo). Derivado do nome,
+        # nunca gravado no JSON — ver Toscanini.PodcastSlug.
+        "podcast_slug" => Toscanini.PodcastSlug.slug(metadata["podcast"]),
         "uuid"         => metadata["uuid"],
         "published"    => metadata["published"],
       }
@@ -106,7 +109,7 @@ defmodule Toscanini.VoxPocketcastJsonRenderer do
   # ---------------------------------------------------------------------------
 
   # Field order matches Python yaml.dump(sort_keys=False) with fm dict order
-  @fm_field_order ~w(title lang description tags aliases participants podcast uuid published)
+  @fm_field_order ~w(title lang description tags aliases participants podcast podcast_slug uuid published)
 
   defp render_frontmatter(fm) do
     lines =

@@ -44,6 +44,7 @@ defmodule Toscanini.VoxPocketcastJsonRendererTest do
       assert out =~ "title: T12ExxNov - República"
       assert out =~ "lang: pt"
       assert out =~ "podcast: Fronteiras da Ciência"
+      assert out =~ "podcast_slug: fronteiras-da-ciencia\n"
       assert out =~ "uuid: 13286f3e-f6c5-4875-a87a-9cd8334b3b78"
       assert out =~ "published: '2021-11-15T14:00:00Z'"
     end
@@ -100,6 +101,7 @@ defmodule Toscanini.VoxPocketcastJsonRendererTest do
     test "frontmatter contains expected fields", %{output: out} do
       assert out =~ "lang: en"
       assert out =~ "podcast: Developer Tea"
+      assert out =~ "podcast_slug: developer-tea\n"
       assert out =~ "uuid: 2d699972-c079-4637-8c66-e91ff97e3e3c"
       assert out =~ "Friday Refill"
     end
