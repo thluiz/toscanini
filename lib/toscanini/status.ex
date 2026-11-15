@@ -38,6 +38,8 @@ defmodule Toscanini.Status do
       done:    Map.get(base, "done", 0),
       running: Map.get(base, "running", 0),
       queued:  Map.get(base, "queued", 0),
+      # Waiting for Claude Code on the author's machine (GET /parked) — not a failure.
+      parked:  Map.get(base, "parked", 0),
       failed:  failed
     }
   end

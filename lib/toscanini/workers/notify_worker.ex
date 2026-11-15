@@ -16,8 +16,40 @@ defmodule Toscanini.Workers.NotifyWorker do
 
     case pipeline.content_type do
       "scholion_quote" -> notify_scholion(pipeline, pid)
+      "scholion_webclip" -> notify_webclip(pipeline, pid)
       _ -> notify_podcast(pipeline, pid)
     end
+  end
+
+  defp notify_webclip(pipeline, pid) do
+    results = Pipeline.get_results(pipeline)
+    compose = results["webclip_compose"] || %{}
+    saved   = results["webclip_save"] || %{}
+    quotes  = get_in(results, ["webclip_quotes", "job_ids"]) || []
+    slug    = saved["slug"] || compose["slug"]
+    title   = compose["title"] || slug
+
+    base = Application.get_env(:toscanini, :scholion_base_url, "https://scholion.thluiz.com")
+    url  = "#{String.trim_trailing(base, "/")}/notes/#{slug}/"
+
+    flag = if compose["verdict"] == "yellow", do: "\n⚠️ ghost-audit: yellow", else: ""
+    via  = if compose["mode"] == "text", do: "\n🌐 capturado pelo Chrome", else: ""
+
+    quote_line =
+      case length(quotes) do
+        0 -> ""
+        n -> "\n💬 #{n} citação(ões) em processamento"
+      end
+
+    msg =
+      "✅ <b>#{escape(title)}</b>\n" <>
+        "<i>Scholion — webclip</i>#{flag}#{via}#{quote_line}\n" <>
+        "🔗 <a href=\"#{url}\">#{escape(url)}</a>"
+
+    GossipGate.send(msg)
+    Pipeline.save_result(pipeline, "notify", %{"done" => true})
+    Dispatcher.advance(pid)
+    :ok
   end
 
   defp notify_scholion(pipeline, pid) do

@@ -54,6 +54,27 @@ defmodule Toscanini.Pipeline do
     |> Repo.update!()
   end
 
+  @doc """
+  Parks a pipeline: it stops without failing and waits for an outside actor
+  (Claude Code with the author's browser) to resume or dismiss it. The
+  reason and its detail go to `results.parked`; `current_step` is kept, so
+  `Dispatcher.rerun/1` re-runs exactly the step that stopped.
+  """
+  def park(pipeline, reason, detail \\ %{}) do
+    parked =
+      Map.merge(detail, %{
+        "reason" => reason,
+        "step" => pipeline.current_step,
+        "at" => DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601()
+      })
+
+    results = get_results(pipeline) |> Map.put("parked", parked)
+
+    pipeline
+    |> changeset(%{status: "parked", results: Jason.encode!(results), error: nil})
+    |> Repo.update!()
+  end
+
   def fail(pipeline, reason) do
     updated = pipeline |> changeset(%{status: "failed", error: reason}) |> Repo.update!()
 

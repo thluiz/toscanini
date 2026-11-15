@@ -18,6 +18,10 @@
 //   unsubscribe_feed — Remove a feed subscription
 //   get_feeds_config  — Get feeds runtime config (safety_hour_utc)
 //   set_feeds_config  — Set feeds runtime config live (no restart)
+//   publish_webclip   — Clip a web page into the Scholion (webclip flow)
+//   list_parked       — Parked pipelines waiting for Claude Code (browser, red audit...)
+//   resume_parked     — Resume a parked pipeline (webclip: page text from the browser)
+//   dismiss_parked    — Give up on a parked pipeline
 
 import type { Config } from "./config";
 
@@ -219,6 +223,68 @@ const TOOLS = [
         },
       },
       required: ["path", "json"],
+    },
+  },
+  {
+    name: "publish_webclip",
+    description:
+      "Clip a web page into the Scholion through the Toscanini webclip flow " +
+      "(compose + ghost-audit + save, optional quote notes). Pages the server can't read " +
+      "are parked for the browser (see list_parked). Same URL already clipped/in flight returns that job.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        url: { type: "string", description: "http(s) URL of the page" },
+        quotes: { type: "array", items: { type: "string" }, description: "Phrases from the page to become quote notes" },
+        comment: { type: "string", description: "Free note from the author, kept with the job" },
+      },
+      required: ["url"],
+    },
+  },
+  {
+    name: "list_parked",
+    description:
+      "List parked pipelines: work the server couldn't finish alone, waiting for Claude Code on the author's machine. " +
+      "reason 'browser' = capture the page text in Claude in Chrome and resume_parked with it; " +
+      "'audit_red' = show findings to the author, then resume (optionally with related_notes) or dismiss; " +
+      "'audit_unavailable' = resume when ghost-audit is back; 'slug_conflict' = usually dismiss.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        content_type: { type: "string", description: "Filter, e.g. 'scholion_webclip'" },
+      },
+    },
+  },
+  {
+    name: "resume_parked",
+    description:
+      "Resume a parked pipeline. For a webclip, pass the page text captured in the browser (text + title) " +
+      "and/or related_notes ([{slug, title, hint?}]); it recomposes and the rest of the flow (save, quotes, notify) runs server-side.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: { type: "string", description: "Parked pipeline id" },
+        text: { type: "string", description: "Page text captured in the browser (get_page_text)" },
+        title: { type: "string", description: "Page/tab title" },
+        related_notes: {
+          type: "array",
+          items: { type: "object", properties: { slug: { type: "string" }, title: { type: "string" }, hint: { type: "string" } } },
+          description: "Scholion notes the author chose to link",
+        },
+      },
+      required: ["id"],
+    },
+  },
+  {
+    name: "dismiss_parked",
+    description: "Give up on a parked pipeline (paywall, dead page...). Marked failed as manual, out of the failure counters.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: { type: "string", description: "Parked pipeline id" },
+        reason: { type: "string", description: "Why it was dismissed" },
+      },
+      required: ["id"],
     },
   },
   {
@@ -579,6 +645,31 @@ async function dispatch(
           resultData = await toscaniniPost(base, "/publish/podcast", {
             path: args.path,
             json: args.json,
+          });
+
+        } else if (toolName === "publish_webclip") {
+          if (!args.url) return err(id, -32602, "Missing required arg: url");
+          const body: Record<string, unknown> = { url: args.url };
+          if (Array.isArray(args.quotes)) body.quotes = args.quotes;
+          if (args.comment) body.comment = args.comment;
+          resultData = await toscaniniPost(base, "/publish/webclip", body);
+
+        } else if (toolName === "list_parked") {
+          const q = args.content_type ? "?content_type=" + encodeURIComponent(args.content_type as string) : "";
+          resultData = await toscaniniGet(base, "/parked" + q);
+
+        } else if (toolName === "resume_parked") {
+          if (!args.id) return err(id, -32602, "Missing required arg: id");
+          const body: Record<string, unknown> = {};
+          if (args.text) body.text = args.text;
+          if (args.title) body.title = args.title;
+          if (Array.isArray(args.related_notes)) body.related_notes = args.related_notes;
+          resultData = await toscaniniPost(base, "/parked/" + encodeURIComponent(args.id as string) + "/resume", body);
+
+        } else if (toolName === "dismiss_parked") {
+          if (!args.id) return err(id, -32602, "Missing required arg: id");
+          resultData = await toscaniniPost(base, "/parked/" + encodeURIComponent(args.id as string) + "/dismiss", {
+            reason: args.reason ?? "",
           });
 
         } else if (toolName === "get_scheduler_config") {

@@ -19,8 +19,34 @@ defmodule Toscanini.Pipeline.Dispatcher do
     "scholion_synthesize" => {:scholion_write,      Workers.ScholionWriteWorker,        :default},
     "scholion_write"      => {:scholion_commit,     Workers.ScholionCommitWorker,       :git_commit},
     "scholion_commit"     => {:notify,              Workers.NotifyWorker,               :default},
+    # Scholion webclip flow (POST /publish/webclip). compose may park the
+    # pipeline (status "parked") instead of failing — see Toscanini.Webclip.
+    "webclip_queued"  => {:webclip_compose, Workers.WebclipComposeWorker, :default},
+    "webclip_compose" => {:webclip_save,    Workers.WebclipSaveWorker,    :default},
+    "webclip_save"    => {:webclip_quotes,  Workers.WebclipQuotesWorker,  :default},
+    "webclip_quotes"  => {:notify,          Workers.NotifyWorker,         :default},
     "notify"        => :done
   }
+
+  @doc """
+  Re-runs the pipeline's current step (used to resume a parked pipeline).
+  `advance/1` runs the successor of `current_step`; this enqueues the worker
+  of `current_step` itself.
+  """
+  def rerun(pipeline_id) do
+    pipeline = Repo.get!(Pipeline, pipeline_id)
+
+    entry =
+      Enum.find(Map.values(@steps), fn
+        {step, _worker, _queue} -> to_string(step) == pipeline.current_step
+        :done -> false
+      end)
+
+    case entry do
+      {step, worker, queue} -> enqueue(pipeline, step, worker, queue)
+      nil -> {:error, "cannot rerun step: #{pipeline.current_step}"}
+    end
+  end
 
   def advance(pipeline_id) do
     pipeline = Repo.get!(Pipeline, pipeline_id)

@@ -22,6 +22,12 @@ config :toscanini, :gossipgate_api_key,
 config :toscanini, :gossipgate_target,
   System.get_env("GOSSIPGATE_TARGET", "toscanini")
 
+# scholion-webclipper key for the `toscanini` principal (role write) — used by
+# the webclip flow (POST /publish/webclip). Empty → every compose gets 401 and
+# the pipeline fails with that message.
+config :toscanini, :webclipper_api_key,
+  System.get_env("WEBCLIPPER_API_KEY", "")
+
 # URL base dos serviços internos (via nginx). Nunca exposta em código.
 # Para apontar para outro host: setar HERMES_BASE_URL no service file.
 config :toscanini, :base_url,

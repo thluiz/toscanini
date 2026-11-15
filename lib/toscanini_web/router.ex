@@ -17,6 +17,10 @@ defmodule ToscaniniWeb.Router do
     post "/publish/podcast",  PublishController, :create
     post "/annotate",        AnnotateController, :create
     post "/publish/scholion", ScholionPublishController, :create
+    post "/publish/webclip",  WebclipPublishController, :create
+    get  "/parked",             ParkedController, :index
+    post "/parked/:id/resume",  ParkedController, :resume
+    post "/parked/:id/dismiss", ParkedController, :dismiss
     post "/ingest/local",   IngestLocalController, :create
     post "/queue/:name/scale", QueueController, :scale
     get  "/scheduler/configs/:queue",  SchedulerController, :show
