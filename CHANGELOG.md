@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.2.47] — 2026-11-16
+
+### Jobs interrompidos por restart voltam para a fila
+
+Sem o plugin `Lifeline`, um job em andamento quando o serviço parava (restart, crash, BSOD) ficava `executing`
+para sempre, e o pipeline dele travava em silêncio. Até aqui a saída era só reiniciar com a fila vazia.
+
+- **`Toscanini.ObanRescue`** — filho da árvore de supervisão entre o `Repo` e o `Oban`. No boot, todo job
+  `executing` vira `available` (é órfão por definição: o Toscanini é um nó só) e tem a tentativa devolvida
+  (`attempt - 1`), para que vários restarts seguidos não esgotem o `max_attempts` e descartem o episódio. Loga
+  cada job resgatado. O trabalho recomeça do zero: o whisper morre junto com o serviço (`KillMode=control-group`).
+- O `Lifeline` foi descartado: resgata por idade, e uma transcrição passa de uma hora.
+
 ## [0.2.46] — 2026-11-16
 
 ### Roteamento de modelos por caso de uso, com perfis `anthropic` e `third-party`

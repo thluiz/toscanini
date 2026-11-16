@@ -7,6 +7,8 @@ defmodule Toscanini.Application do
 
     children = [
       Toscanini.Repo,
+      # Antes do Oban: jobs que ficaram executing num restart voltam para a fila.
+      Toscanini.ObanRescue,
       {Oban, Application.fetch_env!(:toscanini, Oban)},
       ToscaniniWeb.Endpoint
     ]
