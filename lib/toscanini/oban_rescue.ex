@@ -29,7 +29,12 @@ defmodule Toscanini.ObanRescue do
   end
 
   def start_link do
-    rescue_orphans()
+    # Em teste o Oban não executa nada (testing: :manual): não há órfão a resgatar,
+    # e o boot de teste nunca deve mexer em job nenhum.
+    unless Keyword.get(Application.get_env(:toscanini, Oban, []), :testing) == :manual do
+      rescue_orphans()
+    end
+
     :ignore
   end
 

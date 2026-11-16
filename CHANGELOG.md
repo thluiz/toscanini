@@ -12,6 +12,12 @@ para sempre, e o pipeline dele travava em silêncio. Até aqui a saída era só 
   (`attempt - 1`), para que vários restarts seguidos não esgotem o `max_attempts` e descartem o episódio. Loga
   cada job resgatado. O trabalho recomeça do zero: o whisper morre junto com o serviço (`KillMode=control-group`).
 - O `Lifeline` foi descartado: resgata por idade, e uma transcrição passa de uma hora.
+- **`mix test` deixa de usar o banco de produção.** O `config/runtime.exs` roda em todo ambiente e definia o
+  `database` do Repo também em teste, por cima do `/tmp/toscanini_test.db` do `config/test.exs`: a suíte sempre
+  rodou contra `data/orchestrator.db`. O sandbox desfazia as transações, mas o boot da aplicação não passa por ele,
+  e na primeira rodada com o `ObanRescue` o boot de teste marcou como `available` os dois jobs de transcrição que
+  estavam rodando em produção (não chegaram a ser pegos de novo; o restart seguinte os resgatou). Agora o Repo só é
+  configurado no `runtime.exs` fora de `:test`, e o `ObanRescue` não roda com o Oban em `testing: :manual`.
 
 ## [0.2.46] — 2026-11-16
 

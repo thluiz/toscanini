@@ -2,11 +2,17 @@ import Config
 
 # Database — path relativo ao WorkingDirectory do serviço por padrão.
 # Para mover o banco: setar TOSCANINI_DB_PATH no service file. Zero toque em Elixir.
-db_path = System.get_env("TOSCANINI_DB_PATH", "data/orchestrator.db")
+# Fora do ambiente de teste: sem este guarda, o runtime.exs (que roda em todo
+# ambiente) sobrescrevia o /tmp/toscanini_test.db do test.exs, e o `mix test` rodava
+# contra o banco de produção — o sandbox desfazia as transações, mas o que roda no
+# boot da aplicação não passa pelo sandbox.
+if config_env() != :test do
+  db_path = System.get_env("TOSCANINI_DB_PATH", "data/orchestrator.db")
 
-config :toscanini, Toscanini.Repo,
-  adapter: Ecto.Adapters.SQLite3,
-  database: db_path
+  config :toscanini, Toscanini.Repo,
+    adapter: Ecto.Adapters.SQLite3,
+    database: db_path
+end
 
 # Diretório de saída para MP3 e JSON coletados.
 # Para mover: setar TOSCANINI_COLLECTED_DIR no service file.
