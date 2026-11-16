@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.2.45] — 2026-11-16
+
+### Anotação automática volta ao GPT
+
+Sai o Claude Sonnet 5.5 (BYOK Anthropic no OpenRouter) dos dois passes da anotação automática, por custo.
+A cadeia volta à da v0.2.20: `openrouter/openai/gpt-5.2`, fallback `openrouter/openai/gpt-5.1`. DeepSeek e
+Gemini Flash continuam de fora, porque perderam cobertura em podcasts discursivos.
+
+- **`config/config.exs`**: `annotate_model` e `annotate_fallback_models`. O override `TOSCANINI_ANNOTATE_MODEL`
+  segue valendo.
+
 ## [0.2.44] — 2026-11-15
 
 ### `podcast_slug` no frontmatter dos episódios (página `/podcasts/` do Vox)
