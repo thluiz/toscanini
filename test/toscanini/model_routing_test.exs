@@ -67,7 +67,7 @@ defmodule Toscanini.ModelRoutingTest do
 
   test "sem arquivo vivo → semente, perfil third-party" do
     assert ModelRouting.active() == "third-party"
-    assert ModelRouting.chain("toscanini/annotate") == ["openrouter/openai/gpt-5.2", "openrouter/openai/gpt-5.1"]
+    assert ModelRouting.chain("toscanini/annotate") == ["openrouter/openai/gpt-5.1", "openrouter/openai/gpt-5.2"]
   end
 
   test "set_profile persiste e a troca de ida e volta restaura o estado", %{dir: dir} do

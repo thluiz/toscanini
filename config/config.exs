@@ -10,8 +10,8 @@ config :toscanini,
 # (v0.2.20), não usar. TOSCANINI_ANNOTATE_MODEL (config/runtime.exs) mexe só neste
 # valor de reserva.
 config :toscanini,
-  annotate_model: "openrouter/openai/gpt-5.2",
-  annotate_fallback_models: ["openrouter/openai/gpt-5.1"]
+  annotate_model: "openrouter/openai/gpt-5.1",
+  annotate_fallback_models: ["openrouter/openai/gpt-5.2"]
 
 config :toscanini, ToscaniniWeb.Endpoint,
   url: [host: "localhost"],

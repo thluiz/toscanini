@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.2.48] — 2026-11-16
+
+### gpt-5.1 na anotação automática e no webclip (perfil `third-party`)
+
+Decidido a partir dos testes de 2026-11-16 (nota do Obsidian "Roteamento de modelos por caso de uso"):
+
+- **Anotação** (`toscanini/annotate`, `podcast/suggest-annotations`, `podcast/annotate`): `gpt-5.1` → `gpt-5.2`. Escolhe
+  os trechos como o gpt-5.2 (cobertura dos bookmarks do autor igual, acima do aleatório), cita com a mesma
+  fidelidade, custa ~25% menos e escreve descrições mais longas. Os Gemini testados sugerem metade e escolhem pior.
+- **Webclip** (`scholion/webclip-summary`): `gpt-5.1` → `gpt-5.4-mini`; no perfil `anthropic`, Sonnet na frente. O
+  `scholion-webclipper` deixa de forçar o modelo pelo próprio `.env` e passa a seguir esta tabela.
+- **Ghost-audit**: fixtures 8/8 com `gpt-5.2` e `gpt-5.4`; cadeia mantida.
+- Semente, testes e o `annotate_model` de reserva do `config.exs` acompanham.
+
 ## [0.2.47] — 2026-11-16
 
 ### Jobs interrompidos por restart voltam para a fila

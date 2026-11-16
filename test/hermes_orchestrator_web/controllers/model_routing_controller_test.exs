@@ -31,7 +31,7 @@ defmodule ToscaniniWeb.ModelRoutingControllerTest do
   test "GET /resolved devolve o perfil ativo e as cadeias", %{conn: conn} do
     body = json_response(get(conn, "/api/orchestrator/model-routing/resolved"), 200)
     assert body["profile"] == "third-party"
-    assert body["chains"]["toscanini/annotate"] == ["openrouter/openai/gpt-5.2", "openrouter/openai/gpt-5.1"]
+    assert body["chains"]["toscanini/annotate"] == ["openrouter/openai/gpt-5.1", "openrouter/openai/gpt-5.2"]
   end
 
   test "GET / devolve o documento inteiro com resolved", %{conn: conn} do

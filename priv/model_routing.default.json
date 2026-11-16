@@ -1,112 +1,233 @@
 {
   "active": "third-party",
-  "profiles": ["anthropic", "third-party"],
+  "profiles": [
+    "anthropic",
+    "third-party"
+  ],
   "cases": {
     "claudinho/agent": {
       "case": "C1",
       "what": "Agente principal do Claudinho (Telegram, tool calls)",
       "note": "Aplicado pelo model-profile.sh sync na ClaudinhoSandbox; o OpenClaw nao le este arquivo. Kimi trava em tool calls, nao usar.",
-      "anthropic": ["openrouter/anthropic/claude-sonnet-5.5", "openrouter/deepseek/deepseek-v4-pro", "ollama/geral", "ollama/codigo", "ollama/phi4:14b", "ollama/openclaw-fast", "ollama/openclaw-reason", "ollama/openclaw-heavy", "openrouter/deepseek/deepseek-v3.2", "openrouter/openai/gpt-5.2"],
-      "third-party": ["openrouter/deepseek/deepseek-v4-pro", "ollama/geral", "ollama/codigo", "ollama/phi4:14b", "ollama/openclaw-fast", "ollama/openclaw-reason", "ollama/openclaw-heavy", "openrouter/deepseek/deepseek-v3.2", "openrouter/openai/gpt-5.2"]
+      "anthropic": [
+        "openrouter/anthropic/claude-sonnet-5.5",
+        "openrouter/deepseek/deepseek-v4-pro",
+        "ollama/geral",
+        "ollama/codigo",
+        "ollama/phi4:14b",
+        "ollama/openclaw-fast",
+        "ollama/openclaw-reason",
+        "ollama/openclaw-heavy",
+        "openrouter/deepseek/deepseek-v3.2",
+        "openrouter/openai/gpt-5.2"
+      ],
+      "third-party": [
+        "openrouter/deepseek/deepseek-v4-pro",
+        "ollama/geral",
+        "ollama/codigo",
+        "ollama/phi4:14b",
+        "ollama/openclaw-fast",
+        "ollama/openclaw-reason",
+        "ollama/openclaw-heavy",
+        "openrouter/deepseek/deepseek-v3.2",
+        "openrouter/openai/gpt-5.2"
+      ]
     },
     "claudinho/image": {
       "case": "C2",
       "what": "Visao do Claudinho",
       "note": "Aplicado pelo model-profile.sh sync. Haiku nos dois perfis: e o mais barato.",
-      "anthropic": ["openrouter/anthropic/claude-haiku-5.5", "openrouter/google/gemini-2.5-flash-lite", "openrouter/openai/gpt-5.2"],
-      "third-party": ["openrouter/anthropic/claude-haiku-5.5", "openrouter/google/gemini-2.5-flash-lite", "openrouter/openai/gpt-5.2"]
+      "anthropic": [
+        "openrouter/anthropic/claude-haiku-5.5",
+        "openrouter/google/gemini-2.5-flash-lite",
+        "openrouter/openai/gpt-5.2"
+      ],
+      "third-party": [
+        "openrouter/anthropic/claude-haiku-5.5",
+        "openrouter/google/gemini-2.5-flash-lite",
+        "openrouter/openai/gpt-5.2"
+      ]
     },
     "toscanini/annotate": {
       "case": "C3",
       "what": "Anotacao automatica do Toscanini (suggest + annotate)",
-      "note": "DeepSeek e Gemini Flash perderam cobertura em podcast discursivo (Toscanini v0.2.20). Pendente: testar gpt-5.1 como primario.",
-      "anthropic": ["openrouter/anthropic/claude-sonnet-5.5", "openrouter/openai/gpt-5.2", "openrouter/openai/gpt-5.1"],
-      "third-party": ["openrouter/openai/gpt-5.2", "openrouter/openai/gpt-5.1"]
+      "note": "DeepSeek e Gemini Flash perderam cobertura (v0.2.20; reconfirmado em 2026-11-16). gpt-5.1 escolhido em 2026-11-16: escolhe trechos como o gpt-5.2, ~25% mais barato, escreve descricoes mais longas.",
+      "anthropic": [
+        "openrouter/anthropic/claude-sonnet-5.5",
+        "openrouter/openai/gpt-5.2",
+        "openrouter/openai/gpt-5.1"
+      ],
+      "third-party": [
+        "openrouter/openai/gpt-5.1",
+        "openrouter/openai/gpt-5.2"
+      ]
     },
     "podcast/suggest-annotations": {
       "case": "C4",
       "what": "Preset suggest-annotations (skill interativa)",
-      "note": "Mesma restricao do C3. Pendente: testar um modelo Google.",
-      "anthropic": ["openrouter/anthropic/claude-sonnet-5.5", "openrouter/openai/gpt-5.2", "openrouter/openai/gpt-5.1", "openrouter/google/gemini-2.5-flash"],
-      "third-party": ["openrouter/openai/gpt-5.2", "openrouter/openai/gpt-5.1", "openrouter/google/gemini-2.5-flash"]
+      "note": "Mesma restricao do C3. Gemini (2.5-flash, 3.8-flash, 3.1-flash-lite) testado em 2026-11-16: metade das sugestoes e escolha pior; fica so como ultimo fallback.",
+      "anthropic": [
+        "openrouter/anthropic/claude-sonnet-5.5",
+        "openrouter/openai/gpt-5.2",
+        "openrouter/openai/gpt-5.1",
+        "openrouter/google/gemini-2.5-flash"
+      ],
+      "third-party": [
+        "openrouter/openai/gpt-5.1",
+        "openrouter/openai/gpt-5.2",
+        "openrouter/google/gemini-2.5-flash"
+      ]
     },
     "podcast/episode": {
       "case": "C5",
       "what": "Resumo de episodio",
       "note": "DeepSeek na frente nos dois perfis (1.5.0, custo); o resumo so e aceito depois da verificacao (C6).",
-      "anthropic": ["openrouter/deepseek/deepseek-v4-pro", "openrouter/anthropic/claude-sonnet-5.5", "openrouter/openai/gpt-5.2"],
-      "third-party": ["openrouter/deepseek/deepseek-v4-pro", "openrouter/openai/gpt-5.2"]
+      "anthropic": [
+        "openrouter/deepseek/deepseek-v4-pro",
+        "openrouter/anthropic/claude-sonnet-5.5",
+        "openrouter/openai/gpt-5.2"
+      ],
+      "third-party": [
+        "openrouter/deepseek/deepseek-v4-pro",
+        "openrouter/openai/gpt-5.2"
+      ]
     },
     "podcast/episode-verify": {
       "case": "C6",
       "what": "Verificacao e conserto do resumo de episodio",
       "note": "Tem que ser de familia diferente da do primeiro modelo do C5 (DeepSeek). Sem Anthropic, candidato: gemini-2.5-flash.",
-      "anthropic": ["openrouter/anthropic/claude-haiku-5.5"],
-      "third-party": ["openrouter/anthropic/claude-haiku-5.5"]
+      "anthropic": [
+        "openrouter/anthropic/claude-haiku-5.5"
+      ],
+      "third-party": [
+        "openrouter/anthropic/claude-haiku-5.5"
+      ]
     },
     "scholion/webclip-summary": {
       "case": "C7",
       "what": "Resumo de webclip",
-      "note": "Sonnet nos dois perfis: a alternativa antiga (gpt-5.4) custa mais. Pendente: testar gpt-5.1. Tem guarda de idioma.",
-      "anthropic": ["openrouter/anthropic/claude-sonnet-5.5", "openrouter/openai/gpt-5.4", "openrouter/openai/gpt-5.2"],
-      "third-party": ["openrouter/anthropic/claude-sonnet-5.5", "openrouter/openai/gpt-5.4", "openrouter/openai/gpt-5.2"]
+      "note": "Ate 2026-11-16 o scholion-webclipper forcava gpt-5.4-mini pelo proprio .env, fora desta tabela; o override saiu. gpt-5.4-mini fica de fallback: melhor resultado no ghost-audit no teste de 2026-11-16.",
+      "anthropic": [
+        "openrouter/anthropic/claude-sonnet-5.5",
+        "openrouter/openai/gpt-5.1",
+        "openrouter/openai/gpt-5.4-mini"
+      ],
+      "third-party": [
+        "openrouter/openai/gpt-5.1",
+        "openrouter/openai/gpt-5.4-mini"
+      ]
     },
     "scholion/quote-note": {
       "case": "C8",
       "what": "Nota de citacao do Scholion",
       "note": "gpt-5.4 rodou de jul a out, com os ajustes do modo livro e do source-or-silence.",
-      "anthropic": ["openrouter/anthropic/claude-opus-5.5", "openrouter/openai/gpt-5.4", "openrouter/openai/gpt-5.2"],
-      "third-party": ["openrouter/openai/gpt-5.4", "openrouter/openai/gpt-5.2"]
+      "anthropic": [
+        "openrouter/anthropic/claude-opus-5.5",
+        "openrouter/openai/gpt-5.4",
+        "openrouter/openai/gpt-5.2"
+      ],
+      "third-party": [
+        "openrouter/openai/gpt-5.4",
+        "openrouter/openai/gpt-5.2"
+      ]
     },
     "scholion/etymology-note": {
       "case": "C9",
       "what": "Etimologia do Scholion",
       "note": "DeepSeek alucinava glosas e atribuicoes (commit 8e0ee5b); nao usar.",
-      "anthropic": ["openrouter/anthropic/claude-opus-5.5", "openrouter/openai/gpt-5.4", "openrouter/openai/gpt-5.2"],
-      "third-party": ["openrouter/openai/gpt-5.4", "openrouter/openai/gpt-5.2"]
+      "anthropic": [
+        "openrouter/anthropic/claude-opus-5.5",
+        "openrouter/openai/gpt-5.4",
+        "openrouter/openai/gpt-5.2"
+      ],
+      "third-party": [
+        "openrouter/openai/gpt-5.4",
+        "openrouter/openai/gpt-5.2"
+      ]
     },
     "quality/ghost-audit": {
       "case": "C10",
       "what": "Ghost-audit",
-      "note": "Pendente: rodar run-fixtures.ts com gpt-5.2.",
-      "anthropic": ["openrouter/anthropic/claude-opus-5.5", "openrouter/openai/gpt-5.2", "openrouter/openai/gpt-5.4"],
-      "third-party": ["openrouter/openai/gpt-5.2", "openrouter/openai/gpt-5.4"]
+      "note": "Fixtures (run-fixtures.ts) 8/8 com gpt-5.2 e com gpt-5.4 em 2026-11-16.",
+      "anthropic": [
+        "openrouter/anthropic/claude-opus-5.5",
+        "openrouter/openai/gpt-5.2",
+        "openrouter/openai/gpt-5.4"
+      ],
+      "third-party": [
+        "openrouter/openai/gpt-5.2",
+        "openrouter/openai/gpt-5.4"
+      ]
     },
     "dialog/holographic": {
       "case": "C11",
       "what": "Dialogo holografico",
       "note": "Nao esta em uso.",
-      "anthropic": ["openrouter/anthropic/claude-opus-5.5", "openrouter/openai/gpt-4.1", "openrouter/openai/gpt-5.4"],
-      "third-party": ["openrouter/openai/gpt-4.1", "openrouter/openai/gpt-5.4"]
+      "anthropic": [
+        "openrouter/anthropic/claude-opus-5.5",
+        "openrouter/openai/gpt-4.1",
+        "openrouter/openai/gpt-5.4"
+      ],
+      "third-party": [
+        "openrouter/openai/gpt-4.1",
+        "openrouter/openai/gpt-5.4"
+      ]
     },
     "default": {
       "case": "C12",
       "what": "Cadeia global (chat do MCP)",
       "note": "Nenhum preset herda mais esta cadeia. Reserva: DEFAULT_MODELS no .env da vox-intelligence.",
-      "anthropic": ["openrouter/anthropic/claude-sonnet-5.5", "openrouter/deepseek/deepseek-v3.2", "openrouter/openai/gpt-5.2"],
-      "third-party": ["openrouter/deepseek/deepseek-v3.2", "openrouter/openai/gpt-5.2"]
+      "anthropic": [
+        "openrouter/anthropic/claude-sonnet-5.5",
+        "openrouter/deepseek/deepseek-v3.2",
+        "openrouter/openai/gpt-5.2"
+      ],
+      "third-party": [
+        "openrouter/deepseek/deepseek-v3.2",
+        "openrouter/openai/gpt-5.2"
+      ]
     },
     "vision/extract-bookmarks": {
       "case": "C13",
       "what": "Bookmarks por screenshot",
       "note": "Gemini foi o primario de fev a out.",
-      "anthropic": ["openrouter/anthropic/claude-haiku-5.5", "openrouter/google/gemini-2.5-flash-lite", "openrouter/openai/gpt-4o-mini"],
-      "third-party": ["openrouter/google/gemini-2.5-flash-lite", "openrouter/openai/gpt-4o-mini"]
+      "anthropic": [
+        "openrouter/anthropic/claude-haiku-5.5",
+        "openrouter/google/gemini-2.5-flash-lite",
+        "openrouter/openai/gpt-4o-mini"
+      ],
+      "third-party": [
+        "openrouter/google/gemini-2.5-flash-lite",
+        "openrouter/openai/gpt-4o-mini"
+      ]
     },
     "podcast/annotate": {
       "case": "C15",
       "what": "Preset annotate (skill podcast-annotate sem --model)",
       "note": "Mesma restricao do C3.",
-      "anthropic": ["openrouter/anthropic/claude-sonnet-5.5", "openrouter/openai/gpt-5.2", "openrouter/openai/gpt-5.1"],
-      "third-party": ["openrouter/openai/gpt-5.2", "openrouter/openai/gpt-5.1"]
+      "anthropic": [
+        "openrouter/anthropic/claude-sonnet-5.5",
+        "openrouter/openai/gpt-5.2",
+        "openrouter/openai/gpt-5.1"
+      ],
+      "third-party": [
+        "openrouter/openai/gpt-5.1",
+        "openrouter/openai/gpt-5.2"
+      ]
     },
     "meetings/summarize-master-course": {
       "case": "C16",
       "what": "Resumo de encontro do Programa de Mestrado",
       "note": "",
-      "anthropic": ["openrouter/anthropic/claude-sonnet-5.5", "openrouter/openai/gpt-5.2", "openrouter/openai/gpt-5.1"],
-      "third-party": ["openrouter/openai/gpt-5.2", "openrouter/openai/gpt-5.1"]
+      "anthropic": [
+        "openrouter/anthropic/claude-sonnet-5.5",
+        "openrouter/openai/gpt-5.2",
+        "openrouter/openai/gpt-5.1"
+      ],
+      "third-party": [
+        "openrouter/openai/gpt-5.2",
+        "openrouter/openai/gpt-5.1"
+      ]
     }
   }
 }
-
