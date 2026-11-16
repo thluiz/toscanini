@@ -44,14 +44,29 @@ defmodule Toscanini.Workers.AnnotateWorker do
     end
   end
 
+  # Cadeia do caso `toscanini/annotate` no perfil ativo (Toscanini.ModelRouting).
+  # Sem roteamento, vale o config (`annotate_model` + `annotate_fallback_models`).
+  defp annotate_chain do
+    case Toscanini.ModelRouting.chain("toscanini/annotate") do
+      [model | fallbacks] ->
+        {model, fallbacks}
+
+      _ ->
+        {Application.get_env(:toscanini, :annotate_model),
+         Application.get_env(:toscanini, :annotate_fallback_models, [])}
+    end
+  end
+
   defp run(pipeline, pid) do
     json_path = Pipeline.get_results(pipeline)["collect"]["json"]
     json_data = json_path |> File.read!() |> Jason.decode!()
     transcript = json_data["transcript"]
 
+    {model, fallbacks} = annotate_chain()
+
     model_opts = [
-      model: Application.get_env(:toscanini, :annotate_model),
-      fallback_models: Application.get_env(:toscanini, :annotate_fallback_models, []),
+      model: model,
+      fallback_models: fallbacks,
       session_id: VoxIntelligence.pipeline_session(pid)
     ]
 

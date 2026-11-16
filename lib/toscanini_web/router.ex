@@ -25,6 +25,10 @@ defmodule ToscaniniWeb.Router do
     post "/queue/:name/scale", QueueController, :scale
     get  "/scheduler/configs/:queue",  SchedulerController, :show
     put  "/scheduler/configs/:queue",  SchedulerController, :update
+    get  "/model-routing",              ModelRoutingController, :show
+    get  "/model-routing/resolved",     ModelRoutingController, :resolved
+    put  "/model-routing/profile",      ModelRoutingController, :set_profile
+    put  "/model-routing/cases/*key",   ModelRoutingController, :set_case
     get  "/pipelines/find",           PipelineController, :find_by_url
     post "/pipelines/:id/prioritize", PipelineController, :prioritize
 

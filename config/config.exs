@@ -4,10 +4,11 @@ config :toscanini,
   ecto_repos: [Toscanini.Repo],
   generators: [timestamp_type: :utc_datetime]
 
-# Modelo dos dois passes da anotação automática (suggest + annotate). GPT-5.2 na
-# frente, GPT-5.1 de fallback: sai o Sonnet 5.5 (BYOK Anthropic) por custo. DeepSeek
-# e Gemini Flash já perderam cobertura aqui (v0.2.20), não usar. Override em runtime
-# via TOSCANINI_ANNOTATE_MODEL (ver config/runtime.exs).
+# Modelo dos dois passes da anotação automática (suggest + annotate). Quem manda é o
+# roteamento (Toscanini.ModelRouting, caso `toscanini/annotate`); isto só vale se ele
+# não tiver cadeia para o caso. DeepSeek e Gemini Flash já perderam cobertura aqui
+# (v0.2.20), não usar. TOSCANINI_ANNOTATE_MODEL (config/runtime.exs) mexe só neste
+# valor de reserva.
 config :toscanini,
   annotate_model: "openrouter/openai/gpt-5.2",
   annotate_fallback_models: ["openrouter/openai/gpt-5.1"]

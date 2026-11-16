@@ -19,6 +19,9 @@
 //   get_feeds_config  — Get feeds runtime config (safety_hour_utc)
 //   set_feeds_config  — Set feeds runtime config live (no restart)
 //   publish_webclip   — Clip a web page into the Scholion (webclip flow)
+//   get_model_routing — Model chain per use case, both profiles, active profile
+//   set_model_profile — Switch every use case to the 'anthropic' or 'third-party' profile
+//   set_model_chain   — Replace one use case's chain in one profile
 //   list_parked       — Parked pipelines waiting for Claude Code (browser, red audit...)
 //   resume_parked     — Resume a parked pipeline (webclip: page text from the browser)
 //   dismiss_parked    — Give up on a parked pipeline
@@ -285,6 +288,46 @@ const TOOLS = [
         reason: { type: "string", description: "Why it was dismissed" },
       },
       required: ["id"],
+    },
+  },
+  {
+    name: "get_model_routing",
+    description:
+      "Model chain per use case (C1..C16), both profiles ('anthropic' and 'third-party'), which one is active, " +
+      "and the resolved chains of the active profile. Toscanini owns this table; vox-intelligence presets and " +
+      "the Toscanini annotate step read it. The Claudinho (OpenClaw) applies its cases only on " +
+      "model-profile.sh sync.",
+    inputSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "set_model_profile",
+    description:
+      "Switch the active model profile for every use case at once: 'anthropic' (Anthropic first, when there " +
+      "are Anthropic credits) or 'third-party' (GPT/DeepSeek). Takes effect without restart in Toscanini and " +
+      "vox-intelligence. Does NOT switch the Claudinho: run C:\\scripts\\Set-ModelProfile.ps1 for the full switch. " +
+      "Returns warnings for models no longer in the OpenRouter catalog.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        profile: { type: "string", enum: ["anthropic", "third-party"] },
+      },
+      required: ["profile"],
+    },
+  },
+  {
+    name: "set_model_chain",
+    description:
+      "Replace the model chain of one use case in one profile (e.g. case 'scholion/webclip-summary', " +
+      "profile 'third-party', chain ['openrouter/openai/gpt-5.1', 'openrouter/openai/gpt-5.2']). " +
+      "The case key must already exist; see get_model_routing.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        case: { type: "string", description: "Use case key, e.g. 'podcast/episode'" },
+        profile: { type: "string", enum: ["anthropic", "third-party"] },
+        chain: { type: "array", items: { type: "string" }, description: "Ordered models, '<provider>/<id>'" },
+      },
+      required: ["case", "profile", "chain"],
     },
   },
   {
@@ -671,6 +714,30 @@ async function dispatch(
           resultData = await toscaniniPost(base, "/parked/" + encodeURIComponent(args.id as string) + "/dismiss", {
             reason: args.reason ?? "",
           });
+
+        } else if (toolName === "get_model_routing") {
+          resultData = await toscaniniGet(base, "/model-routing");
+
+        } else if (toolName === "set_model_profile" || toolName === "set_model_chain") {
+          const isProfile = toolName === "set_model_profile";
+          if (isProfile && !args.profile) return err(id, -32602, "Missing required arg: profile");
+          if (!isProfile && (!args.case || !args.profile || !args.chain)) {
+            return err(id, -32602, "Missing required args: case, profile, chain");
+          }
+          const path = isProfile
+            ? "/model-routing/profile"
+            : "/model-routing/cases/" + String(args.case).split("/").map(encodeURIComponent).join("/");
+          const body = isProfile ? { profile: args.profile } : { profile: args.profile, chain: args.chain };
+          const res = await fetch(`${base}${path}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          });
+          if (!res.ok) {
+            const text = await res.text().catch(() => "");
+            throw new Error(`Toscanini PUT ${path} returned ${res.status}: ${text}`);
+          }
+          resultData = await res.json();
 
         } else if (toolName === "get_scheduler_config") {
           if (!args.queue) return err(id, -32602, "Missing required arg: queue");

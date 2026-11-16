@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.2.46] — 2026-11-16
+
+### Roteamento de modelos por caso de uso, com perfis `anthropic` e `third-party`
+
+As cadeias de modelos estavam espalhadas em oito presets da vox-intelligence, no `.env` dela, no `config.exs`
+daqui e no `openclaw.json` do Claudinho. Trocar de Anthropic para GPT/DeepSeek (ou voltar, quando há crédito
+Anthropic) era editar código em três lugares e reiniciar. Agora a tabela mora aqui, com os dois perfis completos e
+um perfil ativo, no mesmo padrão do `queue_schedules.json`.
+
+- **`Toscanini.ModelRouting`** — `data/model_routing.json` (vivo) sobre `priv/model_routing.default.json`
+  (semente versionada, vale quando o vivo falta ou está inválido). Cada gravação guarda a versão anterior em
+  `data/model_routing_backups/` (últimas 30) e pede refresh à vox-intelligence. `missing_models/1` confere as
+  cadeias contra o catálogo do OpenRouter.
+- **API** — `GET /model-routing`, `GET /model-routing/resolved`, `PUT /model-routing/profile`
+  (`{"profile": "anthropic"}`), `PUT /model-routing/cases/*key` (`{"profile", "chain"}`). Os PUT devolvem
+  `warnings` com modelos fora do catálogo.
+- **MCP** — `get_model_routing`, `set_model_profile`, `set_model_chain`.
+- **`AnnotateWorker`** — lê o caso `toscanini/annotate`; o `annotate_model` do config vira reserva.
+- **Troca completa** (Toscanini + vox-intelligence + Claudinho): `C:\scripts\Set-ModelProfile.ps1 anthropic`.
+
 ## [0.2.45] — 2026-11-16
 
 ### Anotação automática volta ao GPT
