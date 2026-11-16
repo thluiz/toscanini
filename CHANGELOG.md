@@ -19,6 +19,9 @@ um perfil ativo, no mesmo padrão do `queue_schedules.json`.
 - **MCP** — `get_model_routing`, `set_model_profile`, `set_model_chain`.
 - **`AnnotateWorker`** — lê o caso `toscanini/annotate`; o `annotate_model` do config vira reserva.
 - **Troca completa** (Toscanini + vox-intelligence + Claudinho): `C:\scripts\Set-ModelProfile.ps1 anthropic`.
+- **`deploy/model-routing/`** — cópias canônicas do `Set-ModelProfile.ps1` (Windows) e do `model-profile.sh`
+  (ClaudinhoSandbox), mais o `Install-ModelRouting.ps1`, que instala as duas e confere o SHA-256. As cópias em
+  `C:\scripts` e `~/.openclaw/scripts` são só instaladas; editar aqui.
 
 ## [0.2.45] — 2026-11-16
 
