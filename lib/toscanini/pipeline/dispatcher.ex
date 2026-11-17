@@ -21,8 +21,9 @@ defmodule Toscanini.Pipeline.Dispatcher do
     "scholion_commit"     => {:notify,              Workers.NotifyWorker,               :default},
     # Scholion webclip flow (POST /publish/webclip). compose may park the
     # pipeline (status "parked") instead of failing — see Toscanini.Webclip.
-    "webclip_queued"  => {:webclip_compose, Workers.WebclipComposeWorker, :default},
-    "webclip_compose" => {:webclip_save,    Workers.WebclipSaveWorker,    :default},
+    # compose and save share the serial :webclip queue (limit 1).
+    "webclip_queued"  => {:webclip_compose, Workers.WebclipComposeWorker, :webclip},
+    "webclip_compose" => {:webclip_save,    Workers.WebclipSaveWorker,    :webclip},
     "webclip_save"    => {:webclip_quotes,  Workers.WebclipQuotesWorker,  :default},
     "webclip_quotes"  => {:notify,          Workers.NotifyWorker,         :default},
     "notify"        => :done

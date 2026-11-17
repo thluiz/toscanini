@@ -17,6 +17,9 @@ defmodule Toscanini.Webclip do
     * `"audit_unavailable"` — the audit never ran, every attempt. Resume once the
       audit is back.
     * `"slug_conflict"`     — a note with that slug already exists in the vault.
+    * `"response_mismatch"` — compose answered with a clipping for another URL
+      on every attempt (concurrent calls got each other's responses on
+      2026-11-16). Nothing is saved; resume to compose again.
   """
 
   @park_for_browser ~w[blocked_domain consent_wall_unresolved thin_content]
@@ -32,6 +35,49 @@ defmodule Toscanini.Webclip do
   Returns `:ok` (operation good to save), `:retry`, `{:park, reason, detail}`
   or `{:fail, message}`.
   """
+  def classify_compose(outcome, last_attempt?, expected_url)
+
+  def classify_compose({:ok, op} = outcome, last_attempt?, expected_url)
+      when is_binary(expected_url) do
+    got = get_in(op, ["clipping", "url"])
+
+    cond do
+      same_url?(got, expected_url) ->
+        classify_compose(outcome, last_attempt?)
+
+      last_attempt? ->
+        {:park, "response_mismatch",
+         %{
+           "code" => "response_mismatch",
+           "message" => "compose answered for #{inspect(got)}, expected #{expected_url}"
+         }}
+
+      true ->
+        :retry
+    end
+  end
+
+  def classify_compose(outcome, last_attempt?, _expected_url),
+    do: classify_compose(outcome, last_attempt?)
+
+  @doc """
+  Whether the clipping URL in a compose response is the URL that was sent,
+  ignoring scheme, a leading `www.`, a trailing slash and host case. The
+  webclipper echoes the request URL, so anything else is a response that
+  belongs to another request. A missing URL never matches.
+  """
+  def same_url?(got, expected) when is_binary(got) and is_binary(expected),
+    do: url_key(got) == url_key(expected)
+
+  def same_url?(_got, _expected), do: false
+
+  defp url_key(url) do
+    uri = URI.parse(String.trim(url))
+    host = (uri.host || "") |> String.downcase() |> String.replace_prefix("www.", "")
+    path = (uri.path || "") |> String.trim_trailing("/")
+    {host, path, uri.query}
+  end
+
   def classify_compose({:ok, op}, last_attempt?) do
     audit = op["audit"] || %{}
 

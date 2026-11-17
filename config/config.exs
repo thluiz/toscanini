@@ -25,7 +25,9 @@ config :toscanini, ToscaniniWeb.Endpoint,
 config :toscanini, Oban,
   engine: Oban.Engines.Lite,
   repo: Toscanini.Repo,
-  queues: [collectors: 3, digest: 1, default: 5, git_commit: 1, transcribe: 2, feeds: 1],
+  # webclip: 1 — compose/save hit the webclipper one at a time. Concurrent
+  # compose calls got each other's responses on 2026-11-16 (see CHANGELOG 0.2.49).
+  queues: [collectors: 3, digest: 1, default: 5, git_commit: 1, transcribe: 2, feeds: 1, webclip: 1],
   plugins: [
     # Varre assinaturas de feed de hora em hora (no minuto 0). O worker gateia
     # cada assinatura por janela quente/idle, então isto é barato (conditional GET).

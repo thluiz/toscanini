@@ -7,7 +7,7 @@ defmodule Toscanini.Workers.WebclipComposeWorker do
   through Oban; what the server alone can't solve parks the pipeline
   (see `Toscanini.Webclip.classify_compose/2`).
   """
-  use Oban.Worker, queue: :default, max_attempts: 3
+  use Oban.Worker, queue: :webclip, max_attempts: 3
 
   alias Toscanini.{Repo, Pipeline, Pipeline.Dispatcher, Webclip, WebclipFlow}
   alias Toscanini.Clients.Webclipper
@@ -19,7 +19,7 @@ defmodule Toscanini.Workers.WebclipComposeWorker do
     body = Webclip.compose_body(results["input"], results["resume"])
     outcome = Webclipper.compose(body)
 
-    case Webclip.classify_compose(outcome, attempt >= max) do
+    case Webclip.classify_compose(outcome, attempt >= max, body["url"]) do
       :ok ->
         {:ok, op} = outcome
         save(pipeline, pid, op)
@@ -61,5 +61,6 @@ defmodule Toscanini.Workers.WebclipComposeWorker do
 
   defp summary({:api_error, e}), do: e["code"]
   defp summary({:error, reason}), do: reason
-  defp summary({:ok, op}), do: get_in(op, ["audit", "summary"])
+  defp summary({:ok, op}),
+    do: "clipping #{get_in(op, ["clipping", "url"])}; audit #{get_in(op, ["audit", "summary"])}"
 end

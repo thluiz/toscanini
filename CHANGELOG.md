@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.2.49] — 2026-11-17
+
+### Webclip em fila serial e conferência da URL da resposta
+
+Em 2026-11-16, 31 webclips enviados de uma vez (até 5 compose simultâneos na fila `default`, ao lado de outro
+lote batendo direto no webclipper) receberam respostas trocadas: 13 pipelines gravaram ou tentaram gravar a nota de
+outra URL, um recebeu um artigo do lote da outra sessão, e vários saves deram timeout com 502 no nginx. A causa da
+troca não foi isolada; os dois serviços tratam cada requisição de forma isolada, então ela fica no transporte, sob
+carga.
+
+- **Fila `webclip: 1`** — `WebclipComposeWorker` e `WebclipSaveWorker` saem da `default` (limite 5) para uma fila
+  própria de limite 1. Qualquer quantidade de webclips enviados vira uma fila em série no webclipper, e a `default`
+  deixa de ser disputada com os passos de podcast. `WebclipQuotesWorker` fica na `default` (não chama o webclipper).
+- **Conferência da URL** — `Webclip.classify_compose/3` compara o `clipping.url` da resposta com a URL enviada
+  (`Webclip.same_url?/2`, ignorando esquema, `www.`, barra final e caixa do host; a query conta). Diferente: nova
+  tentativa enquanto houver, e na última o pipeline estaciona com motivo `response_mismatch` sem gravar nada.
+  Retomar com `resume_parked` recompõe.
+- A mensagem de retry do compose passa a incluir a URL do clipping recebido.
+
 ## [0.2.48] — 2026-11-16
 
 ### gpt-5.1 na anotação automática e no webclip (perfil `third-party`)

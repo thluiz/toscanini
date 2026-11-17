@@ -12,7 +12,9 @@ defmodule Toscanini.WebclipFlow do
     "audit_red" => "🛑 <b>Webclip barrado (ghost-audit red)</b> — aguardando revisão local",
     "audit_unavailable" =>
       "🅿️ <b>Webclip parado</b> — ghost-audit indisponível em todas as tentativas",
-    "slug_conflict" => "🅿️ <b>Webclip parado</b> — já existe nota com esse slug"
+    "slug_conflict" => "🅿️ <b>Webclip parado</b> — já existe nota com esse slug",
+    "response_mismatch" =>
+      "🅿️ <b>Webclip parado</b> — o webclipper respondeu com o clipping de outra URL em todas as tentativas"
   }
 
   def park(pipeline, reason, detail) do

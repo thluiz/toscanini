@@ -8,6 +8,57 @@ defmodule Toscanini.WebclipTest do
   defp api(code, retryable \\ false),
     do: {:api_error, %{"code" => code, "message" => "m", "retryable" => retryable}}
 
+  describe "classify_compose/3 (response belongs to the request)" do
+    defp op_for(url, verdict \\ "green"),
+      do: {:ok, %{"operationId" => "op1", "clipping" => %{"url" => url}, "audit" => %{"verdict" => verdict}}}
+
+    test "matching URL falls through to the audit decision" do
+      assert Webclip.classify_compose(op_for("https://a.com/x"), false, "https://a.com/x") == :ok
+
+      assert {:park, "audit_red", _} =
+               Webclip.classify_compose(op_for("https://a.com/x", "red"), false, "https://a.com/x")
+    end
+
+    test "scheme, www., trailing slash and host case don't count as a mismatch" do
+      assert Webclip.classify_compose(op_for("http://WWW.a.com/x/"), false, "https://a.com/x") == :ok
+    end
+
+    test "another URL retries, then parks without saving" do
+      got = op_for("https://devonestes.com/refactoring-for-tests-in-elixir")
+      sent = "https://devonestes.com/go-and-elixir-separated-at-birth"
+
+      assert Webclip.classify_compose(got, false, sent) == :retry
+
+      assert {:park, "response_mismatch", %{"message" => msg}} =
+               Webclip.classify_compose(got, true, sent)
+
+      assert msg =~ "refactoring-for-tests-in-elixir"
+    end
+
+    test "a different query string is another page" do
+      assert Webclip.classify_compose(op_for("https://youtube.com/watch?v=b"), false, "https://youtube.com/watch?v=a") ==
+               :retry
+    end
+
+    test "a response without a clipping URL never passes" do
+      assert Webclip.classify_compose({:ok, %{"audit" => %{"verdict" => "green"}}}, false, "https://a.com") ==
+               :retry
+    end
+
+    test "errors keep their own classification" do
+      assert {:park, "browser", _} = Webclip.classify_compose(api("thin_content"), false, "https://a.com")
+      assert Webclip.classify_compose({:error, "econnrefused"}, false, "https://a.com") == :retry
+    end
+  end
+
+  test "webclip compose and save run on the serial :webclip queue" do
+    assert Toscanini.Workers.WebclipComposeWorker.__opts__()[:queue] == :webclip
+    assert Toscanini.Workers.WebclipSaveWorker.__opts__()[:queue] == :webclip
+
+    queues = Application.get_env(:toscanini, Oban)[:queues] || []
+    assert Keyword.get(queues, :webclip) == 1
+  end
+
   describe "classify_compose/2" do
     test "green and yellow go on to save" do
       assert Webclip.classify_compose(op(%{"verdict" => "green"}), false) == :ok

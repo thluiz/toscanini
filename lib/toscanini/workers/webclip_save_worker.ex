@@ -4,7 +4,7 @@ defmodule Toscanini.Workers.WebclipSaveWorker do
   + note in its own clone of the Scholion repo, one commit, and pushes.
   An expired operation goes back to compose.
   """
-  use Oban.Worker, queue: :default, max_attempts: 3
+  use Oban.Worker, queue: :webclip, max_attempts: 3
 
   alias Toscanini.{Repo, Pipeline, Pipeline.Dispatcher, Webclip, WebclipFlow}
   alias Toscanini.Clients.Webclipper
