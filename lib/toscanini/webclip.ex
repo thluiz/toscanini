@@ -11,9 +11,11 @@ defmodule Toscanini.Webclip do
     * `"browser"`           — the headless fetch can't reach the content
       (blocked domain, consent wall, thin content, fetch failing every attempt).
       Resume with the page `text`.
-    * `"audit_red"`         — ghost-audit said red; the service refuses the save
-      for this principal. Resume (optionally with `related_notes`/`text`) to
-      recompose, or dismiss.
+    * `"audit_red"`         — ghost-audit said red; the service refuses to
+      publish it for this principal. Since 0.2.50 the note is first saved as
+      an unpublished draft (`draft: true`, results `webclip_draft`), so nothing
+      is lost while it waits. Resume (optionally with `related_notes`/`text`)
+      to recompose onto the draft's slug, or dismiss (the draft stays).
     * `"audit_unavailable"` — the audit never ran, every attempt. Resume once the
       audit is back.
     * `"slug_conflict"`     — a note with that slug already exists in the vault.
@@ -157,6 +159,16 @@ defmodule Toscanini.Webclip do
   defp audit_unavailable?(audit) do
     String.starts_with?(to_string(audit["summary"]), "ghost-audit unavailable")
   end
+
+  @doc """
+  Recompose onto the draft's path: when a red note was saved as a draft,
+  the next compose asks for the same slug, so the save that follows
+  replaces the draft instead of leaving a second note next to it.
+  """
+  def with_draft_slug(body, %{"slug" => slug}) when is_binary(slug) and slug != "",
+    do: Map.put(body, "slug", slug)
+
+  def with_draft_slug(body, _draft), do: body
 
   @doc """
   Body of the `compose` call. URL mode by default; text mode when the

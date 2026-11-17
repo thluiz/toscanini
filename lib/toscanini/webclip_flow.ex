@@ -10,6 +10,8 @@ defmodule Toscanini.WebclipFlow do
   @reason_label %{
     "browser" => "🅿️ <b>Webclip na fila do Chrome</b> — o servidor não conseguiu ler a página",
     "audit_red" => "🛑 <b>Webclip barrado (ghost-audit red)</b> — aguardando revisão local",
+    "audit_red_draft" =>
+      "🛑 <b>Webclip barrado (ghost-audit red)</b> — guardado como rascunho (não publicado), aguardando revisão local",
     "audit_unavailable" =>
       "🅿️ <b>Webclip parado</b> — ghost-audit indisponível em todas as tentativas",
     "slug_conflict" => "🅿️ <b>Webclip parado</b> — já existe nota com esse slug",
@@ -21,7 +23,15 @@ defmodule Toscanini.WebclipFlow do
     Pipeline.park(pipeline, reason, detail)
 
     url = input_url(pipeline)
-    label = Map.get(@reason_label, reason, "🅿️ <b>Webclip parado</b> (#{escape(reason)})")
+    label_key = if reason == "audit_red" and detail["draft_note"], do: "audit_red_draft", else: reason
+    label = Map.get(@reason_label, label_key, "🅿️ <b>Webclip parado</b> (#{escape(reason)})")
+
+    draft =
+      cond do
+        detail["draft_note"] -> "\n📝 rascunho: <code>#{escape(detail["draft_note"])}</code>"
+        detail["draft_error"] -> "\n⚠️ rascunho NÃO gravado: #{escape(detail["draft_error"])}"
+        true -> ""
+      end
 
     why =
       case {detail["code"], detail["message"]} do
@@ -33,7 +43,7 @@ defmodule Toscanini.WebclipFlow do
       end
 
     GossipGate.send(
-      "#{label}\n#{escape(url)}#{why}#{format_findings(detail["findings"])}\n🔎 job: <code>#{escape(pipeline.id)}</code>"
+      "#{label}\n#{escape(url)}#{draft}#{why}#{format_findings(detail["findings"])}\n🔎 job: <code>#{escape(pipeline.id)}</code>"
     )
 
     :ok

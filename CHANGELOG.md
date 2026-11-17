@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.2.50] — 2026-11-17
+
+### Webclip red vira rascunho no vault
+
+Até aqui um webclip com ghost-audit red só estacionava: a captura e a nota composta ficavam apenas na operação
+pendente do webclipper, que a varredura apaga depois de 24h. Se a página saísse do ar nesse intervalo, perdia-se.
+
+- **Rascunho antes de estacionar** — com verdict red, o `WebclipComposeWorker` chama o save do webclipper com
+  `draft: true` (scholion-webclipper `5150248`, Decision 11): clipping e nota vão para o vault com
+  `draft: true` e `audit_verdict: "red"` no frontmatter, e o Hugo não os publica. O resultado fica em
+  `results.webclip_draft` (slug, caminhos, commit) e o aviso no Telegram diz onde o rascunho está. Se o save do
+  rascunho falhar, o pipeline estaciona do mesmo jeito e o aviso diz que o rascunho não foi gravado.
+- **Retomar recompõe por cima do rascunho** — `Webclip.with_draft_slug/2` põe o `slug` do rascunho no `compose`
+  seguinte; o save que vier depois (green/yellow, ou red de novo como rascunho) substitui o arquivo, em vez de
+  criar uma segunda nota. Descartar mantém o rascunho no vault.
+- `Webclipper.save/2` aceita `draft: true`.
+
 ## [0.2.49] — 2026-11-17
 
 ### Webclip em fila serial e conferência da URL da resposta

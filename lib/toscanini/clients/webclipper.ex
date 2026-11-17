@@ -37,10 +37,19 @@ defmodule Toscanini.Clients.Webclipper do
     |> handle()
   end
 
-  @doc "`POST /webclip/{id}/save` in `commit` mode: the service writes, commits and pushes its own clone."
-  def save(operation_id) when is_binary(operation_id) do
+  @doc """
+  `POST /webclip/{id}/save` in `commit` mode: the service writes, commits and
+  pushes its own clone. `draft: true` keeps a red note as an unpublished draft
+  (`draft: true` in its frontmatter) instead of refusing it.
+  """
+  def save(operation_id, opts \\ []) when is_binary(operation_id) do
+    body =
+      if Keyword.get(opts, :draft, false),
+        do: %{"mode" => "commit", "draft" => true},
+        else: %{"mode" => "commit"}
+
     Req.post("#{base_url()}/api/webclip/webclip/#{operation_id}/save",
-      json: %{"mode" => "commit"},
+      json: body,
       headers: headers(),
       receive_timeout: @save_timeout,
       retry: false

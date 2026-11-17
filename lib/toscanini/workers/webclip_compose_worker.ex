@@ -16,7 +16,10 @@ defmodule Toscanini.Workers.WebclipComposeWorker do
   def perform(%Oban.Job{args: %{"pipeline_id" => pid}, attempt: attempt, max_attempts: max}) do
     pipeline = Repo.get!(Pipeline, pid)
     results = Pipeline.get_results(pipeline)
-    body = Webclip.compose_body(results["input"], results["resume"])
+    body =
+      Webclip.compose_body(results["input"], results["resume"])
+      |> Webclip.with_draft_slug(results["webclip_draft"])
+
     outcome = Webclipper.compose(body)
 
     case Webclip.classify_compose(outcome, attempt >= max, body["url"]) do
@@ -27,11 +30,40 @@ defmodule Toscanini.Workers.WebclipComposeWorker do
       :retry ->
         {:error, "webclipper compose: transient (#{inspect(summary(outcome))})"}
 
+      {:park, "audit_red", detail} ->
+        {:ok, op} = outcome
+        {pipeline, detail} = save_draft(pipeline, op, detail)
+        WebclipFlow.park(pipeline, "audit_red", detail)
+
       {:park, reason, detail} ->
         WebclipFlow.park(pipeline, reason, detail)
 
       {:fail, message} ->
         WebclipFlow.fail(pipeline, message)
+    end
+  end
+
+  # A red note goes into the vault as an unpublished draft before the
+  # pipeline parks, so the capture and the composed text never depend on the
+  # webclipper's 24h operation. Resuming recomposes with the draft's slug
+  # (see `Webclip.with_draft_slug/2`) and the next save replaces the draft.
+  # If the draft save itself fails, the pipeline still parks, saying so.
+  defp save_draft(pipeline, op, detail) do
+    case Webclipper.save(op["operationId"], draft: true) do
+      {:ok, saved} ->
+        draft = %{
+          "slug" => saved["slug"],
+          "note_path" => saved["notePath"],
+          "clipping_path" => saved["clippingPath"],
+          "operation_id" => op["operationId"],
+          "commit" => saved["commit"]
+        }
+
+        pipeline = Pipeline.save_result(pipeline, "webclip_draft", draft)
+        {pipeline, Map.put(detail, "draft_note", saved["notePath"])}
+
+      other ->
+        {pipeline, Map.put(detail, "draft_error", inspect(other) |> String.slice(0, 300))}
     end
   end
 

@@ -51,6 +51,18 @@ defmodule Toscanini.WebclipTest do
     end
   end
 
+  describe "with_draft_slug/2" do
+    test "recompose of a red draft asks for the draft's slug" do
+      assert Webclip.with_draft_slug(%{"url" => "u"}, %{"slug" => "my-draft"}) ==
+               %{"url" => "u", "slug" => "my-draft"}
+    end
+
+    test "no draft, no slug" do
+      assert Webclip.with_draft_slug(%{"url" => "u"}, nil) == %{"url" => "u"}
+      assert Webclip.with_draft_slug(%{"url" => "u"}, %{"slug" => ""}) == %{"url" => "u"}
+    end
+  end
+
   test "webclip compose and save run on the serial :webclip queue" do
     assert Toscanini.Workers.WebclipComposeWorker.__opts__()[:queue] == :webclip
     assert Toscanini.Workers.WebclipSaveWorker.__opts__()[:queue] == :webclip
