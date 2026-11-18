@@ -22,7 +22,8 @@ fi
 
 # --- deno: required JS runtime for yt-dlp 2026.06+ YouTube extraction
 if [[ -x "$DENO_BIN" ]]; then
-  say "deno already installed at $DENO_BIN (skipping)"
+  say "deno already installed at $DENO_BIN, upgrading..."
+  "$DENO_BIN" upgrade --quiet || say "WARNING: deno upgrade failed (keeping current)" >&2
 else
   say "Installing deno..."
   curl -fsSL https://deno.land/install.sh | sh

@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.2.52] — 2026-11-18
+
+### YouTube volta a baixar áudio: player clients escolhidos pelo yt-dlp
+
+O lote `ea744a8d` falhou no `kU-t1qsEbqk` com `HTTP Error 403`. No HermesTools o yt-dlp estava em 2026.06.09 e o
+collector fixava `--extractor-args youtube:player_client=web_embedded,android_vr` (contorno de junho). Com o yt-dlp
+2026.10.21 nenhum dos dois devolve formato de áudio para esse vídeo: `web_embedded` cai em "playback on other
+websites has been disabled", `android_vr` exige GVS PO token. Os clients padrão do yt-dlp, com o deno resolvendo o
+desafio JS, devolvem o áudio (formato 251).
+
+- **`Collectors.Youtube` não fixa mais player clients** — o yt-dlp escolhe. Override pontual via
+  `TOSCANINI_YTDLP_EXTRACTOR_ARGS` (ex.: `youtube:player_client=default,mweb`), que vira `--extractor-args`.
+- **`deploy/setup-host.sh` atualiza o deno** (`deno upgrade`) quando ele já está instalado, em vez de pular.
+- Host atualizado: yt-dlp 2026.10.21, deno 2.9.8. O PATH do `toscanini.service` já incluía `~/.deno/bin`
+  (`[debug] JS runtimes: deno-2.9.8` num collect rodado com o env do serviço).
+- Um 403 esporádico de mídia ainda aparece; o `CollectWorker` tenta 3 vezes.
+
 ## [0.2.51] — 2026-11-18
 
 ### Espelho das assinaturas de feed em SUBSCRIPTIONS.md e restauração
