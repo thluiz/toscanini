@@ -69,9 +69,19 @@ defmodule Toscanini.Pipeline.Dispatcher do
     |> Pipeline.changeset(%{current_step: to_string(step), status: "running"})
     |> Repo.update!()
 
-    worker.new(%{"pipeline_id" => pipeline.id}, queue: queue) |> Oban.insert!()
+    worker.new(%{"pipeline_id" => pipeline.id}, queue: queue, priority: priority(step))
+    |> Oban.insert!()
+
     :ok
   end
+
+  @doc """
+  Oban priority of a step (0 runs first). In the serial `:webclip` queue a
+  save must not wait behind every compose already queued: compose gets 1,
+  so each note is saved right after its own compose.
+  """
+  def priority(:webclip_compose), do: 1
+  def priority(_step), do: 0
 
   defp complete(pipeline) do
     pipeline

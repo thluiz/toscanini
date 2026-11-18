@@ -115,4 +115,80 @@ defmodule ToscaniniWeb.WebclipControllersTest do
       assert json_response(post(conn, "/api/orchestrator/parked/nope/dismiss", %{}), 404)
     end
   end
+
+  describe "resume at save (same operation, no new compose)" do
+    defp insert_at_save(status) do
+      id = Ecto.UUID.generate()
+
+      Repo.insert!(%Pipeline{
+        id: id,
+        content_type: "scholion_webclip",
+        collector: "publish_webclip",
+        status: "running",
+        current_step: "webclip_save",
+        params: Jason.encode!(%{"url" => "https://example.com/s"}),
+        results:
+          Jason.encode!(%{
+            "input" => %{"url" => "https://example.com/s"},
+            "webclip_compose" => %{"operation_id" => "op-42", "expires_at" => "2026-11-19T10:00:00Z"}
+          })
+      })
+
+      p = Repo.get!(Pipeline, id)
+
+      case status do
+        "parked" -> Pipeline.park(p, "save_failed", %{"code" => "unreachable", "message" => "timeout"})
+        "failed" -> Pipeline.fail(p, "webclipper unreachable on save: timeout")
+      end
+
+      id
+    end
+
+    defp jobs_for(id) do
+      import Ecto.Query
+      Repo.all(from j in Oban.Job, where: fragment("json_extract(?, '$.pipeline_id')", j.args) == ^id)
+    end
+
+    test "parked save_failed re-runs save with priority 0 in the webclip queue", %{conn: conn} do
+      id = insert_at_save("parked")
+
+      assert %{"step" => "webclip_save"} =
+               json_response(post(conn, "/api/orchestrator/parked/#{id}/resume", %{}), 202)
+
+      p = Repo.get!(Pipeline, id)
+      assert p.status == "running"
+      assert p.current_step == "webclip_save"
+      assert Pipeline.get_results(p)["webclip_compose"]["operation_id"] == "op-42"
+
+      assert [job] = jobs_for(id)
+      assert job.worker == "Toscanini.Workers.WebclipSaveWorker"
+      assert job.queue == "webclip"
+      assert job.priority == 0
+    end
+
+    test "a webclip that failed at save can be resumed", %{conn: conn} do
+      id = insert_at_save("failed")
+
+      assert %{"step" => "webclip_save"} =
+               json_response(post(conn, "/api/orchestrator/parked/#{id}/resume", %{}), 202)
+
+      p = Repo.get!(Pipeline, id)
+      assert p.status == "running"
+      assert p.error == nil
+    end
+
+    test "resuming with page text recomposes (priority 1)", %{conn: conn} do
+      id = insert_at_save("parked")
+
+      assert %{"step" => "webclip_compose"} =
+               json_response(
+                 post(conn, "/api/orchestrator/parked/#{id}/resume", %{"text" => "corpo"}),
+                 202
+               )
+
+      assert [job] = jobs_for(id)
+      assert job.worker == "Toscanini.Workers.WebclipComposeWorker"
+      assert job.priority == 1
+    end
+  end
 end

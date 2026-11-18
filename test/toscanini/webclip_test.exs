@@ -138,10 +138,76 @@ defmodule Toscanini.WebclipTest do
       assert {:park, "audit_red", _} = Webclip.classify_save(api("audit_red"), false)
     end
 
-    test "retryable errors retry while attempts remain" do
+    test "retryable errors retry while attempts remain, then park save_failed" do
       assert Webclip.classify_save(api("internal_error", true), false) == :retry
-      assert {:fail, _} = Webclip.classify_save(api("internal_error", true), true)
+
+      assert {:park, "save_failed", %{"code" => "internal_error"}} =
+               Webclip.classify_save(api("internal_error", true), true)
+
       assert {:fail, _} = Webclip.classify_save(api("forbidden"), false)
+    end
+
+    test "transport failure (timeout, 502) retries, then parks save_failed" do
+      assert Webclip.classify_save({:error, "webclipper HTTP 502: \"\""}, false) == :retry
+
+      assert {:park, "save_failed", %{"code" => "unreachable", "message" => "timeout"}} =
+               Webclip.classify_save({:error, "timeout"}, true)
+    end
+  end
+
+  describe "resume_step/4" do
+    @composed %{"webclip_compose" => %{"operation_id" => "op-1"}}
+
+    test "parked save_failed with a known operation retries the save" do
+      results = Map.put(@composed, "parked", %{"reason" => "save_failed", "step" => "webclip_save"})
+      assert Webclip.resume_step("parked", "webclip_save", results, %{}) == "webclip_save"
+    end
+
+    test "failed at save (before 0.2.53) retries the save" do
+      assert Webclip.resume_step("failed", "webclip_save", @composed, %{}) == "webclip_save"
+    end
+
+    test "new page text or related notes need a fresh compose" do
+      results = Map.put(@composed, "parked", %{"reason" => "save_failed"})
+
+      assert Webclip.resume_step("parked", "webclip_save", results, %{"text" => "t"}) ==
+               "webclip_compose"
+
+      assert Webclip.resume_step("parked", "webclip_save", results, %{
+               "related_notes" => [%{"slug" => "s"}]
+             }) == "webclip_compose"
+    end
+
+    test "other park reasons, even at save, recompose" do
+      for reason <- ~w[slug_conflict audit_red browser response_mismatch] do
+        results = Map.put(@composed, "parked", %{"reason" => reason, "step" => "webclip_save"})
+        assert Webclip.resume_step("parked", "webclip_save", results, %{}) == "webclip_compose"
+      end
+    end
+
+    test "without an operation id it recomposes" do
+      results = %{"parked" => %{"reason" => "save_failed"}}
+      assert Webclip.resume_step("parked", "webclip_save", results, %{}) == "webclip_compose"
+      assert Webclip.resume_step("failed", "webclip_save", %{}, %{}) == "webclip_compose"
+    end
+
+    test "failed at compose recomposes" do
+      assert Webclip.resume_step("failed", "webclip_compose", @composed, %{}) == "webclip_compose"
+    end
+  end
+
+  describe "priority in the webclip queue" do
+    test "save runs before queued composes" do
+      assert Toscanini.Pipeline.Dispatcher.priority(:webclip_save) <
+               Toscanini.Pipeline.Dispatcher.priority(:webclip_compose)
+    end
+  end
+
+  describe "ObanNotifier.last_attempt?/1" do
+    test "only the last attempt notifies" do
+      refute Toscanini.ObanNotifier.last_attempt?(%{attempt: 1, max_attempts: 3})
+      refute Toscanini.ObanNotifier.last_attempt?(%{attempt: 2, max_attempts: 3})
+      assert Toscanini.ObanNotifier.last_attempt?(%{attempt: 3, max_attempts: 3})
     end
   end
 

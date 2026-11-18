@@ -16,7 +16,9 @@ defmodule Toscanini.WebclipFlow do
       "🅿️ <b>Webclip parado</b> — ghost-audit indisponível em todas as tentativas",
     "slug_conflict" => "🅿️ <b>Webclip parado</b> — já existe nota com esse slug",
     "response_mismatch" =>
-      "🅿️ <b>Webclip parado</b> — o webclipper respondeu com o clipping de outra URL em todas as tentativas"
+      "🅿️ <b>Webclip parado</b> — o webclipper respondeu com o clipping de outra URL em todas as tentativas",
+    "save_failed" =>
+      "🅿️ <b>Webclip composto, save falhou</b> — retomar tenta o save da mesma operação (sem novo compose)"
   }
 
   def park(pipeline, reason, detail) do
@@ -32,6 +34,11 @@ defmodule Toscanini.WebclipFlow do
         detail["draft_error"] -> "\n⚠️ rascunho NÃO gravado: #{escape(detail["draft_error"])}"
         true -> ""
       end
+
+    draft =
+      if detail["expires_at"],
+        do: draft <> "\n⏳ operação vale até <code>#{escape(detail["expires_at"])}</code>",
+        else: draft
 
     why =
       case {detail["code"], detail["message"]} do

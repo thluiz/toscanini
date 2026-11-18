@@ -22,18 +22,21 @@ defmodule Toscanini.ObanNotifier do
     check_batch_on_failure(job)
   end
 
-  # Exceção inesperada num job
-  # Oban emite :exception (não :stop/:discard) para exceptions — verificar batch aqui também
+  # Exceção ou {:error, _} num job. O Oban emite :exception a cada tentativa
+  # que falha; só a última vira aviso no Telegram (as anteriores são retry
+  # normal e só poluíam o canal com "1/3", "2/3").
   def handle_event([:oban, :job, :exception], _measurements, %{job: job, reason: reason}, _config) do
-    error_text = Exception.format(:error, reason) |> String.slice(0, 400)
-    notify_failure(job, "excepção: #{error_text}")
-    # Avançar batch se foi a última tentativa
-    if job.attempt >= job.max_attempts do
+    if last_attempt?(job) do
+      error_text = Exception.format(:error, reason) |> String.slice(0, 400)
+      notify_failure(job, "excepção: #{error_text}")
       check_batch_on_failure(job)
     end
   end
 
   def handle_event(_, _, _, _), do: :ok
+
+  @doc false
+  def last_attempt?(%{attempt: attempt, max_attempts: max}), do: attempt >= max
 
   defp notify_failure(job, reason_label) do
     last_error =

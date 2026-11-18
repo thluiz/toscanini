@@ -22,6 +22,9 @@ defmodule Toscanini.Webclip do
     * `"response_mismatch"` — compose answered with a clipping for another URL
       on every attempt (concurrent calls got each other's responses on
       2026-11-16). Nothing is saved; resume to compose again.
+    * `"save_failed"`       — compose went fine but save failed transiently on
+      every attempt (timeout, 502). Resume retries the save of the same
+      operation while it lives (24h); expired, it recomposes.
   """
 
   @park_for_browser ~w[blocked_domain consent_wall_unresolved thin_content]
@@ -132,6 +135,11 @@ defmodule Toscanini.Webclip do
   Classifies a `save` outcome: `:ok`, `:retry`, `{:park, reason, detail}` or
   `{:fail, message}`. An expired operation can't be saved anymore, so it goes
   back to compose (`:recompose`).
+
+  A transient failure (timeout, 502, retryable error) on the last attempt
+  parks with `"save_failed"` instead of failing: the composed operation lives
+  24h in the webclipper, so resuming retries the save of that same operation
+  without paying for a new compose (see `resume_step/2`).
   """
   def classify_save({:ok, _saved}, _last), do: :ok
 
@@ -146,15 +154,46 @@ defmodule Toscanini.Webclip do
   def classify_save({:api_error, %{"code" => "operation_already_saved"}}, _last), do: :ok
 
   def classify_save({:api_error, %{"code" => code} = e}, last) do
-    if e["retryable"] == true and not last,
-      do: :retry,
-      else: {:fail, "webclipper save #{code}: #{e["message"]}"}
+    cond do
+      e["retryable"] == true and not last ->
+        :retry
+
+      e["retryable"] == true ->
+        {:park, "save_failed", %{"code" => code, "message" => e["message"]}}
+
+      true ->
+        {:fail, "webclipper save #{code}: #{e["message"]}"}
+    end
   end
 
   def classify_save({:error, _reason}, false), do: :retry
 
   def classify_save({:error, reason}, true),
-    do: {:fail, "webclipper unreachable on save: #{reason}"}
+    do: {:park, "save_failed", %{"code" => "unreachable", "message" => to_string(reason)}}
+
+  @doc """
+  Step a webclip resumes at, from the pipeline's `status`, `current_step`,
+  `results` and the resume params. A pipeline that stopped at save (parked
+  `"save_failed"`, or failed at `webclip_save` before 0.2.53) with a known
+  operation and no new page text or related notes retries the save of that
+  operation: if it expired, the save answers `operation_not_found` and the
+  flow recomposes by itself. Anything else needs a fresh operation, so it
+  resumes at compose.
+  """
+  def resume_step(status, current_step, results, resume) do
+    op_id = get_in(results, ["webclip_compose", "operation_id"])
+
+    stopped_at_save? =
+      case status do
+        "parked" -> get_in(results, ["parked", "reason"]) == "save_failed"
+        "failed" -> current_step == "webclip_save"
+        _ -> false
+      end
+
+    if is_binary(op_id) and op_id != "" and stopped_at_save? and map_size(resume || %{}) == 0,
+      do: "webclip_save",
+      else: "webclip_compose"
+  end
 
   defp audit_unavailable?(audit) do
     String.starts_with?(to_string(audit["summary"]), "ghost-audit unavailable")

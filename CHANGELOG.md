@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.2.53] — 2026-11-18
+
+### Webclip: save retomável sem novo compose, save na frente dos composes, aviso só na última tentativa
+
+- **Save que esgota as tentativas estaciona (`save_failed`)** — antes, timeout/502 no save nas 3 tentativas
+  falhava o pipeline, e reenviar refazia o compose (custo LLM). Agora `Webclip.classify_save/2` devolve
+  `{:park, "save_failed", ...}` para erro de transporte ou `retryable` na última tentativa; o park guarda
+  `operation_id` e `expires_at` (o aviso no Telegram diz até quando a operação vale). Erro não-retryable continua
+  falhando.
+- **Retomar no passo save** — `Webclip.resume_step/4` decide onde o webclip retoma: estacionado `save_failed` (ou
+  failed em `webclip_save`, caso dos pipelines anteriores a esta versão), com `operation_id` em
+  `results.webclip_compose` e sem `text`/`related_notes` novos → `webclip_save`, com a mesma operação; o resto →
+  `webclip_compose`, como antes. Operação expirada responde `operation_not_found` e o save já volta ao compose
+  sozinho. `POST /parked/:id/resume` (MCP `resume_parked`) aceita também um webclip `failed` em `webclip_save`;
+  limpa o `error`.
+- **Save na frente na fila `webclip: 1`** — `Dispatcher.priority/1`: compose entra com prioridade Oban 1, todo o
+  resto com 0. Com N URLs enfileiradas, o save de cada nota roda logo depois do próprio compose, em vez de esperar
+  os N composes.
+- **Telegram só na última tentativa** — `ObanNotifier` deixa de mandar "❌ Toscanini — falha no pipeline" a cada
+  tentativa que falha (1/3, 2/3); avisa só quando `attempt >= max_attempts`. Vale para todos os workers.
+- toscanini-mcp (fora do git): descrições de `list_parked`/`resume_parked` citam `save_failed`.
+- Testes: `webclip_test.exs` (classify_save, resume_step, priority, last_attempt?) e `webclip_controllers_test.exs`
+  (resume no save: fila, prioridade, failed retomável; resume com texto recompõe com prioridade 1).
+
 ## [0.2.52] — 2026-11-18
 
 ### YouTube volta a baixar áudio: player clients escolhidos pelo yt-dlp
