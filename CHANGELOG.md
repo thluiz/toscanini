@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.51] — 2026-11-18
+
+### Espelho das assinaturas de feed em SUBSCRIPTIONS.md e restauração
+
+O banco não tem backup e `feed_subscriptions` é a única tabela que é configuração (as demais são fila e histórico).
+
+- **`Toscanini.Feeds.Backup`** — reescreve `SUBSCRIPTIONS.md` (raiz do repo) quando uma assinatura é criada, alterada ou removida (`Feeds.subscribe/2`, `update_subscription/2`, `delete_subscription/1`). Escrita atômica, sem regravar se o conteúdo não mudou; falha de escrita só vira log e não derruba a operação. O watermark fica fora do arquivo. O commit é manual.
+- **`mix toscanini.restore_subscriptions`** (`--file`, `--dry-run`) — recria as assinaturas a partir do arquivo, pulando as que já existem. Sobe só o Repo e o cliente HTTP (sem Oban nem endpoint). Cada uma passa por `Feeds.subscribe/2`, que grava um watermark novo (episódio mais recente, sem backfill).
+- `Feeds.subscribe/2` ganha `opts` (`sync: false` pula a escrita do arquivo, usado na restauração).
+- Testes: `test/toscanini/feeds/backup_test.exs`. O ambiente de teste desliga a escrita (`:subscriptions_md_path` nil).
+- Precisa de restart do serviço para valer.
+
 ## [0.2.50] — 2026-11-17
 
 ### Webclip red vira rascunho no vault

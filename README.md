@@ -205,7 +205,23 @@ SQLite at `data/orchestrator.db`. Key tables:
 - **pipelines** — `id, status, current_step, params, results, error`
 - **batches** — `id, total, done, failed, status`
 - **batch_items** — `batch_id, position, url, status, pipeline_id, error`
+- **feed_subscriptions** — podcast feed subscriptions and their check schedule (configuration, not transactional)
 - **oban_jobs** — Oban's job queue (managed by Oban)
+
+## Backup and restore
+
+The database is **not backed up**. `data/` is untracked and `oban_jobs` (millions of rows, most of the ~2 GB) is transactional, so losing it only drops in-flight episodes.
+
+The one table that is configuration is `feed_subscriptions`. Its settings are mirrored in [`SUBSCRIPTIONS.md`](SUBSCRIPTIONS.md) (title, `feed_ref`, `active`, `auto_annotate`, `check_days`, intervals). The last-seen-episode watermark is left out on purpose.
+
+**Keeping it current:** the file is rewritten automatically whenever a subscription is created, updated or deleted (`Toscanini.Feeds.Backup.sync/0`, called from `Feeds`). A failed write is only logged. **Committing it is manual**: until it is pushed, the file lives on the same disk as the database.
+
+**To restore after losing the database:**
+
+1. Install the code and the systemd unit (`deploy/README.md`), then `mix deps.get`.
+2. `mix ecto.migrate` against an empty `data/orchestrator.db`.
+3. `mix toscanini.restore_subscriptions` (options: `--file PATH`, `--dry-run`). It reads `SUBSCRIPTIONS.md`, skips subscriptions that already exist and recreates the rest through `Feeds.subscribe/2`. Each one is fetched from PocketCasts to set a fresh watermark (the latest episode, no backfill), so it needs network. It starts only the Repo and the HTTP client, not Oban or the endpoint. Exit status 1 if any subscription fails.
+4. `pipelines` (processing history) is not restored. Whether anything depends on it to avoid reprocessing was not verified.
 
 ## Queues
 

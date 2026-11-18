@@ -16,6 +16,7 @@ defmodule Toscanini.Feeds do
   require Logger
 
   alias Toscanini.{Repo, FeedSubscription, Batches, Pipeline}
+  alias Toscanini.Feeds.Backup
   alias Toscanini.Pipeline.Dispatcher
   alias Toscanini.Collectors.Pocketcasts
 
@@ -41,7 +42,10 @@ defmodule Toscanini.Feeds do
   # Update vindo do HTTP (input não-confiável): aplica a allowlist de campos que
   # o utilizador pode alterar. Campos internos (watermark, etag) NÃO passam aqui.
   def update_subscription(%FeedSubscription{} = sub, attrs) do
-    do_update(sub, normalize_attrs(attrs))
+    with {:ok, updated} <- do_update(sub, normalize_attrs(attrs)) do
+      Backup.sync()
+      {:ok, updated}
+    end
   end
 
   # Update interno (confiável): grava watermark/etag/last_checked_at diretamente,
@@ -52,7 +56,12 @@ defmodule Toscanini.Feeds do
     |> Repo.update()
   end
 
-  def delete_subscription(%FeedSubscription{} = sub), do: Repo.delete(sub)
+  def delete_subscription(%FeedSubscription{} = sub) do
+    with {:ok, _} = ok <- Repo.delete(sub) do
+      Backup.sync()
+      ok
+    end
+  end
 
   # ---- Subscribe (watermark init, sem submeter) -----------------------------
 
@@ -60,8 +69,11 @@ defmodule Toscanini.Feeds do
   Cria uma assinatura. Aceita `feed_ref` (podcast_uuid) ou `url` (de podcast/
   episódio PocketCasts, da qual extrai o uuid). Faz um fetch inicial só pra
   gravar o watermark e os headers de cache — **não submete nenhum episódio**.
+
+  Reescreve o `SUBSCRIPTIONS.md` ao final (`Feeds.Backup.sync/0`); `sync: false`
+  pula isso (a restauração em lote não reescreve o arquivo).
   """
-  def subscribe(attrs) do
+  def subscribe(attrs, opts \\ []) do
     attrs = normalize_attrs(attrs)
     # Sem check_days explícito → inferir a janela quente da cadência do feed no
     # priming (ver infer_check_days/2). check_days presente (mesmo []) é respeitado.
@@ -74,7 +86,11 @@ defmodule Toscanini.Feeds do
       |> FeedSubscription.changeset(attrs)
       |> Repo.insert()
       |> case do
-        {:ok, sub}      -> {:ok, prime_watermark(sub, infer_schedule?)}
+        {:ok, sub} ->
+          primed = prime_watermark(sub, infer_schedule?)
+          if Keyword.get(opts, :sync, true), do: Backup.sync()
+          {:ok, primed}
+
         {:error, _} = e -> e
       end
     end

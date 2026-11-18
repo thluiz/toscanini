@@ -11,6 +11,9 @@ config :toscanini, ToscaniniWeb.Endpoint,
   http: [ip: {127, 0, 0, 1}, port: 4002],
   secret_key_base: "testsecretkey1234567890testsecretkey1234567890testsecretkey12345678"
 
+# Sem escrita do SUBSCRIPTIONS.md nos testes (o caminho padrão é a raiz do repo de produção).
+config :toscanini, :subscriptions_md_path, nil
+
 config :logger, level: :warning
 config :phoenix, :plug_init_mode, :runtime
 
