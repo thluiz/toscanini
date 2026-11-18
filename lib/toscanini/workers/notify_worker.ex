@@ -67,27 +67,33 @@ defmodule Toscanini.Workers.NotifyWorker do
     url  = "#{String.trim_trailing(base, "/")}/notes/#{slug}/"
 
     msg =
-      if draft do
-        # ghost-audit red → commitada como draft (fora do ar até corrigir).
-        "🛑 <b>Scholion — barrada (ghost-audit red) → salva como DRAFT</b>\n" <>
-          "<i>#{escape(title)}</i>\n" <>
-          "slug: <code>#{escape(slug)}</code>\n" <>
-          "Não vai ao ar até corrigir e remover <code>draft: true</code>.\n" <>
-          format_findings(findings) <>
-          "\n🔎 job: <code>#{escape(pipeline.id)}</code>"
-      else
-        flag = if verdict == "yellow", do: "\n⚠️ ghost-audit: yellow (revisar)", else: ""
+      cond do
+        draft and synth["draft_reason"] == "unverified" ->
+          # Sem fonte verificável para a atribuição → draft para revisão.
+          "📝 <b>Scholion — autoria sem fonte verificável → salva como DRAFT</b>\n" <>
+            "<i>#{escape(title)}</i>\n" <>
+            "slug: <code>#{escape(slug)}</code>\n" <>
+            "🔎 #{escape(to_string(authorship["notes"]))}\n" <>
+            "Não vai ao ar até conferir a fonte e remover <code>draft: true</code>." <>
+            format_findings(findings) <>
+            "\n🔎 job: <code>#{escape(pipeline.id)}</code>"
 
-        auth_flag =
-          if authorship["verified"] == false,
-            do: "\n🔎 autoria não verificada — conferir: #{escape(to_string(authorship["notes"]))}",
-            else: ""
+        draft ->
+          # ghost-audit red → commitada como draft (fora do ar até corrigir).
+          "🛑 <b>Scholion — barrada (ghost-audit red) → salva como DRAFT</b>\n" <>
+            "<i>#{escape(title)}</i>\n" <>
+            "slug: <code>#{escape(slug)}</code>\n" <>
+            "Não vai ao ar até corrigir e remover <code>draft: true</code>.\n" <>
+            format_findings(findings) <>
+            "\n🔎 job: <code>#{escape(pipeline.id)}</code>"
 
-        lex = if lexical == [], do: "", else: "\n📝 lexical: #{escape(Enum.join(lexical, "; "))}"
+        true ->
+          flag = if verdict == "yellow", do: "\n⚠️ ghost-audit: yellow (revisar)", else: ""
+          lex = if lexical == [], do: "", else: "\n📝 lexical: #{escape(Enum.join(lexical, "; "))}"
 
-        "✅ <b>#{escape(title)}</b>\n" <>
-          "<i>Scholion — citação</i>#{flag}#{auth_flag}#{lex}\n" <>
-          "🔗 <a href=\"#{url}\">#{escape(url)}</a>"
+          "✅ <b>#{escape(title)}</b>\n" <>
+            "<i>Scholion — citação</i>#{flag}#{lex}\n" <>
+            "🔗 <a href=\"#{url}\">#{escape(url)}</a>"
       end
 
     GossipGate.send(msg)

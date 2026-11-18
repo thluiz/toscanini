@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.2.54] — 2026-11-18
+
+### Citação sem fonte verificável vira rascunho
+
+Em 2026-11-17, 8 citações vindas de tweets (`POST /publish/scholion` com `source_url` = tweet) saíram publicadas com
+atribuição a livros inventada pelo preset `quote-note`. A correção principal é no vox-intelligence 1.9.0 (tweet sempre
+em `sources`, obra só com fonte consultada, nada atribuído ao solicitante); aqui, o que o preset não conseguir
+sustentar não vai ao ar.
+
+- **`ScholionSynthesizeWorker.draft_reason/2`** — além de ghost-audit red (`"audit_red"`), `authorship.verified ==
+  false` (`"unverified"`) também serializa a nota com `draft: true`. `results.scholion_synthesize.draft_reason`
+  guarda o motivo; o commit continua `note(draft): ...`.
+- **Aviso no Telegram** — rascunho por autoria diz "autoria sem fonte verificável → salva como DRAFT", com as
+  `authorship.notes`. O aviso "autoria não verificada" na nota publicada sai (ela não publica mais).
+- Testes: `test/toscanini/scholion_draft_reason_test.exs`.
+
 ## [0.2.53] — 2026-11-18
 
 ### Webclip: save retomável sem novo compose, save na frente dos composes, aviso só na última tentativa

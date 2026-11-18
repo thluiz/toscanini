@@ -7,6 +7,8 @@ defmodule Toscanini.Workers.ScholionSynthesizeWorker do
   - verdict != red → segue e publica.
   - verdict == red → re-serializa com `draft: true` e segue mesmo assim: a nota
     fica versionada em content/notes/, mas o Hugo não a publica (draft).
+  - `authorship.verified == false` (sem fonte verificável para a atribuição) →
+    também `draft: true`, com o que a pesquisa encontrou, para revisão.
   """
   use Oban.Worker, queue: :default, max_attempts: 3
 
@@ -55,9 +57,10 @@ defmodule Toscanini.Workers.ScholionSynthesizeWorker do
       end
 
     verdict = audit["verdict"]
-    is_draft = verdict == "red"
+    reason = draft_reason(verdict, authorship)
+    is_draft = reason != nil
 
-    # Red → re-serializa determinísticamente com draft: true (nota fica fora do ar).
+    # Red ou autoria sem fonte → re-serializa com draft: true (nota fica fora do ar).
     final_note = if is_draft, do: Note.to_markdown(fields, date, draft: true), else: note
 
     Pipeline.save_result(pipeline, "scholion_synthesize", %{
@@ -67,6 +70,7 @@ defmodule Toscanini.Workers.ScholionSynthesizeWorker do
       "authorship"       => authorship,
       "verdict"          => verdict,
       "draft"            => is_draft,
+      "draft_reason"     => reason,
       "findings"         => audit["findings"] || [],
       "summary"          => audit["summary"],
       "lexical_warnings" => lexical
@@ -75,4 +79,13 @@ defmodule Toscanini.Workers.ScholionSynthesizeWorker do
     Dispatcher.advance(pid)
     :ok
   end
+
+  @doc """
+  Por que a nota vai como rascunho, ou `nil` se publica: `"audit_red"` (portão
+  de voz) ou `"unverified"` (o preset não achou fonte verificável para a
+  atribuição: `authorship.verified == false`).
+  """
+  def draft_reason("red", _authorship), do: "audit_red"
+  def draft_reason(_verdict, %{"verified" => false}), do: "unverified"
+  def draft_reason(_verdict, _authorship), do: nil
 end
