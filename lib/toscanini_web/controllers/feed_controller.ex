@@ -9,7 +9,8 @@ defmodule ToscaniniWeb.FeedController do
     json(conn, FeedsConfig.read())
   end
 
-  # PUT /feeds/config — {safety_hour_utc: 0..23}. Muda ao vivo, sem restart.
+  # PUT /feeds/config — {safety_hours_utc: [0..23], hot_grace_min: 0..59}. Muda ao
+  # vivo, sem restart. safety_hour_utc (inteiro, legado) vira safety_hours_utc: [h].
   def put_config(conn, params) do
     case FeedsConfig.put(Map.drop(params, ["id"])) do
       {:ok, cfg}       -> json(conn, cfg)

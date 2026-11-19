@@ -13,7 +13,8 @@ defmodule Toscanini.FeedSubscription do
     # Quando true, o pipeline roda a etapa de anotação automática (suggest→annotate)
     # antes de publicar. Só os programas marcados anotam — ver [[AnnotateWorker]].
     field :auto_annotate,     :boolean, default: false
-    # JSON array serializado, ex.: ["thu","fri"]. nil/"[]" → janela quente sempre ligada.
+    # JSON array serializado, ex.: ["thu","fri"]. nil/"[]" → sem janela quente (só a
+    # rede de segurança, FeedsConfig.safety_hours_utc/0).
     field :check_days,        :string
     field :hot_interval_min,  :integer, default: 60
     field :idle_interval_min, :integer, default: 1440

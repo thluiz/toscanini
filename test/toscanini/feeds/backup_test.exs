@@ -34,9 +34,14 @@ defmodule Toscanini.Feeds.BackupTest do
              ] = rows
     end
 
-    test "check_days vazio vira 'sempre' e volta como lista vazia" do
+    test "check_days vazio vira 'nenhum' e volta como lista vazia" do
       md = Backup.render([sub(%{title: "X", feed_ref: "x-1", check_days: nil})])
-      assert md =~ "| sempre |"
+      assert md =~ "| nenhum |"
+      assert {:ok, [%{check_days: []}]} = Backup.parse(md)
+    end
+
+    test "rótulo antigo 'sempre' (antes da v0.2.56) ainda é lido como lista vazia" do
+      md = "| T | pocketcasts | `r-1` | sim | não | sempre | 60 | 1440 |\n"
       assert {:ok, [%{check_days: []}]} = Backup.parse(md)
     end
 

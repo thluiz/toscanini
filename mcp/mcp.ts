@@ -16,7 +16,7 @@
 //   list_feeds       — List feed subscriptions
 //   check_feed_now   — Force a feed check now
 //   unsubscribe_feed — Remove a feed subscription
-//   get_feeds_config  — Get feeds runtime config (safety_hour_utc)
+//   get_feeds_config  — Get feeds runtime config (safety_hours_utc, hot_grace_min)
 //   set_feeds_config  — Set feeds runtime config live (no restart)
 //   publish_webclip   — Clip a web page into the Scholion (webclip flow)
 //   get_model_routing — Model chain per use case, both profiles, active profile
@@ -505,19 +505,26 @@ const TOOLS = [
   {
     name: "get_feeds_config",
     description:
-      "Get the feeds runtime config. Currently: safety_hour_utc — the UTC hour (0-23) of the " +
-      "daily safety-net feed check that runs outside a podcast's hot window (check_days).",
+      "Get the feeds runtime config: safety_hours_utc — UTC hours (0-23) of the safety-net feed checks, " +
+      "which cover every subscription outside its hot window (check_days; empty check_days = no hot window, " +
+      "safety checks only); hot_grace_min — grace minutes on the hot-window threshold.",
     inputSchema: { type: "object", properties: {} },
   },
   {
     name: "set_feeds_config",
     description:
-      "Update the feeds runtime config live (no restart). safety_hour_utc: UTC hour 0-23 of the daily " +
-      "safety-net check. hot_grace_min: grace minutes 0-59 on the hot-window threshold. Persisted to data/feeds_config.json.",
+      "Update the feeds runtime config live (no restart). safety_hours_utc: list of UTC hours 0-23 of the " +
+      "safety-net checks (default [3, 15]). hot_grace_min: grace minutes 0-59 on the hot-window threshold. " +
+      "Persisted to data/feeds_config.json.",
     inputSchema: {
       type: "object",
       properties: {
-        safety_hour_utc: { type: "number", description: "UTC hour 0-23 of the daily safety-net check" },
+        safety_hours_utc: {
+          type: "array",
+          items: { type: "number" },
+          description: "UTC hours 0-23 of the safety-net checks, e.g. [3, 15]",
+        },
+        safety_hour_utc: { type: "number", description: "Legacy: a single UTC hour; same as safety_hours_utc: [h]" },
         hot_grace_min: { type: "number", description: "Grace minutes 0-59 on the hot-window threshold (default 10)" },
       },
     },
@@ -807,9 +814,10 @@ async function dispatch(
 
         } else if (toolName === "set_feeds_config") {
           const cfgBody: Record<string, unknown> = {};
+          if (args.safety_hours_utc !== undefined) cfgBody.safety_hours_utc = args.safety_hours_utc;
           if (args.safety_hour_utc !== undefined) cfgBody.safety_hour_utc = args.safety_hour_utc;
           if (args.hot_grace_min !== undefined) cfgBody.hot_grace_min = args.hot_grace_min;
-          if (Object.keys(cfgBody).length === 0) return err(id, -32602, "Provide safety_hour_utc and/or hot_grace_min");
+          if (Object.keys(cfgBody).length === 0) return err(id, -32602, "Provide safety_hours_utc and/or hot_grace_min");
           const cfgRes = await fetch(`${base}/feeds/config`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },

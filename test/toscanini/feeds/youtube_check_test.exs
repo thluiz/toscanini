@@ -48,7 +48,7 @@ defmodule Toscanini.Feeds.YoutubeCheckTest do
       assert sub.title == "NORMOSE"
       assert sub.last_published_at == ~U[2026-11-18 15:00:06Z]
       assert sub.last_episode_uuid == "vid_new_002"
-      # 3 vídeos < amostra mínima de 4 → hot sempre ligado
+      # 3 vídeos < amostra mínima de 4 → sem janela quente
       assert FeedSubscription.check_days(sub) == []
       assert urls() == []
     end

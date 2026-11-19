@@ -10,9 +10,10 @@ defmodule Toscanini.FeedsTest do
   # Quinta-feira, 2026-07-16 12:00:00 UTC (day_of_week = 4 → "thu"): dia quente p/ check_days=[thu]
   @thu ~U[2026-07-16 12:00:00Z]
   # Sexta-feira (dia idle p/ check_days=[thu]).
-  # 06:00 UTC = hora-âncora default da rede de segurança (FeedsConfig, sem arquivo).
-  @fri_safety ~U[2026-07-17 06:00:00Z]
-  # 12:00 UTC = fora da hora-âncora.
+  # 03:00 e 15:00 UTC = horas-âncora default da rede de segurança (FeedsConfig, sem arquivo).
+  @fri_safety ~U[2026-07-17 03:00:00Z]
+  @fri_safety_pm ~U[2026-07-17 15:00:00Z]
+  # 12:00 UTC = fora das horas-âncora.
   @fri_noon ~U[2026-07-17 12:00:00Z]
 
   defp sub(attrs), do: struct(FeedSubscription, attrs)
@@ -39,19 +40,28 @@ defmodule Toscanini.FeedsTest do
       assert Feeds.due?(s, @thu)
     end
 
-    test "check_days vazio → janela quente sempre ligada (usa hot_interval mesmo fora da hora-âncora)" do
+    test "check_days vazio → sem janela quente: fora das âncoras não checa, mesmo com hot_interval vencido" do
       s = sub(check_days: nil, hot_interval_min: 60, last_checked_at: DateTime.add(@fri_noon, -61, :minute))
-      assert Feeds.due?(s, @fri_noon)
+      refute Feeds.due?(s, @fri_noon)
+      refute Feeds.due?(%{s | check_days: "[]"}, @fri_noon)
+    end
+
+    test "check_days vazio → checa nas duas âncoras (03:00 e 15:00 UTC)" do
+      s = sub(check_days: "[]", hot_interval_min: 60, last_checked_at: DateTime.add(@fri_safety, -12, :hour))
+      assert Feeds.due?(s, @fri_safety)
+      # 15:00 UTC, último check às 03:00:30 do mesmo dia: 11h59 < 12h, mas o gap é 6h
+      s = %{s | last_checked_at: ~U[2026-07-17 03:00:30Z]}
+      assert Feeds.due?(s, @fri_safety_pm)
     end
   end
 
-  describe "due?/2 — rede de segurança diária (hora-âncora 06:00 UTC, default)" do
+  describe "due?/2 — rede de segurança (âncoras 03:00 e 15:00 UTC, default)" do
     test "dia idle, na hora-âncora, >12h desde o último check → devido" do
       s = sub(check_days: ~s(["thu"]), hot_interval_min: 60, last_checked_at: DateTime.add(@fri_safety, -20, :hour))
       assert Feeds.due?(s, @fri_safety)
     end
 
-    test "dia idle, na hora-âncora, mas checado há 2h → NÃO devido (gap < 12h)" do
+    test "dia idle, na hora-âncora, mas checado há 2h → NÃO devido (gap < 6h)" do
       s = sub(check_days: ~s(["thu"]), hot_interval_min: 60, last_checked_at: DateTime.add(@fri_safety, -2, :hour))
       refute Feeds.due?(s, @fri_safety)
     end
@@ -118,14 +128,51 @@ defmodule Toscanini.FeedsTest do
       assert Feeds.infer_check_days(eps) == ["tue"]
     end
 
-    test "amostra pequena (< 4) → [] (hot sempre ligado)" do
+    test "amostra pequena (< 4) → [] (sem janela quente)" do
       eps = weekly(~U[2026-07-14 09:00:00Z], 3)
       assert Feeds.infer_check_days(eps) == []
     end
 
-    test "diário (≥ 5 dias distintos) → [] (hot sempre ligado)" do
-      eps = weekly(~U[2026-07-14 09:00:00Z], 12, 1)
+    test "diário todo dia → os 7 dias (fica quente)" do
+      eps = weekly(~U[2026-07-14 09:00:00Z], 30, 1)
+      assert Feeds.infer_check_days(eps) == ~w(mon tue wed thu fri sat sun)
+    end
+
+    test "diário de segunda a sexta → seg–sex (fica quente)" do
+      # 4 semanas × seg..sex; 2026-06-01 é segunda.
+      eps =
+        for week <- 0..3, day <- 0..4 do
+          dt = DateTime.add(~U[2026-06-01 10:00:00Z], (week * 7 + day) * 86_400, :second)
+          %{"published" => DateTime.to_iso8601(dt)}
+        end
+
+      assert Feeds.infer_check_days(eps) == ~w(mon tue wed thu fri)
+    end
+
+    test "4 dias por semana (≥ 4/semana) conta como diário → os 4 dias" do
+      eps =
+        for week <- 0..2, day <- 0..3 do
+          dt = DateTime.add(~U[2026-06-01 10:00:00Z], (week * 7 + day) * 86_400, :second)
+          %{"published" => DateTime.to_iso8601(dt)}
+        end
+
+      assert Feeds.infer_check_days(eps) == ~w(mon tue wed thu)
+    end
+
+    test "pouco frequente e espalhado (~2/semana em dias variados) → [] (sem janela quente)" do
+      # 12 episódios a cada 3 dias: cai em dias diferentes, ~2,3/semana
+      eps = weekly(~U[2026-07-14 09:00:00Z], 12, 3)
       assert Feeds.infer_check_days(eps) == []
+    end
+
+    test "dormente (último episódio > 60 dias) → [] no subscribe, mesmo que fosse diário" do
+      eps = weekly(~U[2023-12-16 13:00:00Z], 30, 1)
+      {latest, _} = Feeds.latest_episode(eps)
+
+      assert length(Feeds.infer_check_days(eps)) == 7
+      assert Feeds.schedule_for(eps, latest, ~U[2026-11-19 12:00:00Z]) == []
+      assert Feeds.schedule_for(eps, latest, ~U[2024-01-10 12:00:00Z]) |> length() == 7
+      assert Feeds.schedule_for([], nil, ~U[2026-11-19 12:00:00Z]) == []
     end
 
     test "drift de meia-noite: mistura seg/ter puxa o vizinho" do

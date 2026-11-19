@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.2.56] — 2026-11-19
+
+### Janela quente só para dias fixos ou programa diário; rede de segurança 2×/dia
+
+Janela quente (checagem horária) só faz sentido para quem publica em 1 a 3 dias fixos da semana, ou para programa
+diário. O resto fica só com a rede de segurança, que agora roda duas vezes por dia.
+
+- **`check_days` vazio = sem janela quente** — antes era "hot sempre ligado" (checagem de hora em hora todo dia);
+  agora a assinatura só é checada nas horas da rede de segurança.
+- **`infer_check_days/2`** — programa diário (≥ 4 episódios/semana na amostra) fica quente nos dias em que publicou
+  nos últimos 28 dias (ex.: seg–sex). Fora isso, a regra dos dias dominantes de antes, mas resultado com mais de 3
+  dias vira `[]` (antes o corte em 3 podia passar para 4–5 com os vizinhos de drift).
+- **Feed dormente** — sem episódio há mais de 60 dias, o subscribe não infere janela quente
+  (`Feeds.schedule_for/3`, `Feeds.dormant?/2`), qualquer que tenha sido a cadência antiga.
+- **`FeedsConfig.safety_hours_utc`** — lista de horas UTC da rede de segurança, default `[3, 15]` (antes uma hora
+  só, `safety_hour_utc`, default 6). A chave antiga continua aceita no `PUT /feeds/config` e no arquivo
+  `data/feeds_config.json`, e vira `[h]`. O gap mínimo desde o último check passa a ser metade do menor intervalo
+  entre âncoras (`[3, 15]` → 6h; antes 12h fixo, que com âncoras a 12h de distância pulava a segunda checagem por
+  segundos).
+- **`SUBSCRIPTIONS.md`** — `check_days` vazio sai como `nenhum` (antes `sempre`); o parse aceita os dois.
+- **MCP `get/set_feeds_config`** — `safety_hours_utc` (lista); `safety_hour_utc` fica como legado.
+- Testes: `feeds_test.exs`, `feeds_config_test.exs`, `feeds/backup_test.exs`.
+
 ## [0.2.55] — 2026-11-19
 
 ### Inscrição em canais do YouTube

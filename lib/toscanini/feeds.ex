@@ -8,8 +8,9 @@ defmodule Toscanini.Feeds do
     * **Backfill off**: `subscribe/1` grava um watermark (`last_published_at`) e
       NÃO processa o catálogo. Só episódios publicados depois entram.
     * **Janela quente**: `due?/2` checa de `hot_interval_min` em `hot_interval_min`
-      nos dias de `check_days`; fora deles, só a cada `idle_interval_min` (rede de
-      segurança diária).
+      nos dias de `check_days` (1 a 3 dias fixos de publicação). Fora deles, e em
+      toda assinatura sem `check_days`, só a rede de segurança nas horas
+      `FeedsConfig.safety_hours_utc/0` (default 03:00 e 15:00 UTC).
     * **Conditional GET**: `check/1` reusa etag/last_modified pra baratear o poll.
   """
   import Ecto.Query
@@ -22,9 +23,15 @@ defmodule Toscanini.Feeds do
 
   @day_abbr {"mon", "tue", "wed", "thu", "fri", "sat", "sun"}
 
-  # Gap mínimo desde o último check para a rede de segurança disparar (evita
-  # duplo disparo na hora-âncora e respeita checks recentes de dia quente).
-  @safety_min_gap_hours 12
+  # Janela quente só faz sentido para quem publica em até 3 dias fixos da semana,
+  # ou para programa diário (≥ @daily_per_week episódios/semana), que fica quente
+  # nos dias em que publica. Fora isso, só a rede de segurança.
+  @max_hot_days 3
+  @daily_per_week 4
+  @daily_window_days 28
+  # Sem episódio há mais que isso → dormente: sem janela quente, qualquer que tenha
+  # sido a cadência antiga.
+  @dormant_days 60
 
   # ---- CRUD -----------------------------------------------------------------
 
@@ -123,7 +130,7 @@ defmodule Toscanini.Feeds do
           # dominantes de publicação. Os episódios já vêm em UTC — mesmo
           # referencial de hot?/2 e due?/2. do_update serializa a lista→JSON.
           if infer_schedule?,
-            do: Map.put(base, :check_days, infer_check_days(episodes)),
+            do: Map.put(base, :check_days, schedule_for(episodes, latest_dt, now)),
             else: base
 
         other ->
@@ -176,29 +183,64 @@ defmodule Toscanini.Feeds do
   @doc """
   Deriva os `check_days` (janela quente) da cadência de publicação do feed.
 
-  Olha os até `sample` episódios mais recentes, monta o histograma de dia-da-
-  semana (UTC) e devolve o menor conjunto de dias no topo que cobre ≥ 80% da
-  amostra (no máx. 3 dias), incluindo um vizinho ±1 dia com ≥ 25% da amostra
-  (drift de meia-noite / fuso). Amostra pequena (< 4) ou espalhada por ≥ 5 dias
-  distintos → `[]` (hot sempre ligado). Devolve abreviações em ordem natural da
-  semana. Função pura: recebe a lista de episódios já buscada no priming.
+  Olha os até `sample` episódios mais recentes:
+
+    * **Diário** (≥ 4 episódios/semana na amostra) → os dias da semana em que houve
+      episódio nos últimos 28 dias (ex.: seg–sex). Programa diário fica quente.
+    * Senão, monta o histograma de dia-da-semana (UTC) e devolve o menor conjunto de
+      dias no topo que cobre ≥ 80% da amostra, incluindo um vizinho ±1 dia com ≥ 25%
+      da amostra (drift de meia-noite / fuso). Amostra pequena (< 4), espalhada por
+      ≥ 5 dias distintos ou resultado com mais de 3 dias → `[]` (sem janela quente:
+      só a rede de segurança).
+
+  Devolve abreviações em ordem natural da semana. Função pura: recebe a lista de episódios já buscada no priming.
   """
   def infer_check_days(episodes, sample \\ 12) do
-    dated =
+    all_dated =
       episodes
       |> Enum.map(fn ep -> parse_published(ep["published"]) end)
       |> Enum.reject(&is_nil/1)
       |> Enum.sort({:desc, DateTime})
-      |> Enum.take(sample)
 
+    dated = Enum.take(all_dated, sample)
     n = length(dated)
     hist = Enum.frequencies(Enum.map(dated, &day_abbr/1))
 
     cond do
       n < 4 -> []
+      daily?(dated) -> recent_days(all_dated)
       map_size(hist) >= 5 -> []
-      true -> dominant_days(hist, n)
+      true ->
+        days = dominant_days(hist, n)
+        if length(days) > @max_hot_days, do: [], else: days
     end
+  end
+
+  @doc false
+  # Janela quente inferida no subscribe; feed dormente (ou vazio) → [].
+  def schedule_for(episodes, latest_dt, now) do
+    if dormant?(latest_dt, now), do: [], else: infer_check_days(episodes)
+  end
+
+  @doc "true se o episódio mais recente tem mais de 60 dias (ou não há nenhum)."
+  def dormant?(nil, _now), do: true
+  def dormant?(%DateTime{} = latest, now), do: DateTime.diff(now, latest, :day) > @dormant_days
+
+  # Episódios/semana na amostra (desc): (n-1) intervalos no período coberto.
+  defp daily?([newest | _] = dated) do
+    span_days = DateTime.diff(newest, List.last(dated), :second) / 86_400
+    span_days > 0 and (length(dated) - 1) * 7 / span_days >= @daily_per_week
+  end
+
+  # Dias da semana com episódio na janela recente (a partir do mais recente).
+  defp recent_days([newest | _] = all_dated) do
+    cutoff = DateTime.add(newest, -@daily_window_days, :day)
+
+    all_dated
+    |> Enum.filter(&(DateTime.compare(&1, cutoff) == :gt))
+    |> Enum.map(&day_abbr/1)
+    |> Enum.uniq()
+    |> Enum.sort_by(&day_index/1)
   end
 
   # Menor conjunto de dias no topo cobrindo ≥ 80% (cap 3) + vizinhos de drift.
@@ -242,12 +284,12 @@ defmodule Toscanini.Feeds do
 
   @doc """
   Decide se a assinatura deve ser checada agora. Dentro da janela quente
-  (dia ∈ check_days, ou check_days vazio) usa `hot_interval_min` menos
+  (dia ∈ check_days) usa `hot_interval_min` menos
   `FeedsConfig.hot_grace_min/0` de folga (senão o sweep horário era pulado por
   segundos — ver [[FeedsConfig]]).
-  Fora dela, roda uma **rede de segurança 1×/dia à hora UTC configurada**
-  (`FeedsConfig.safety_hour_utc/0`, default 06:00 UTC — editável em runtime, sem
-  redeploy) — âncora de relógio, não intervalo à deriva.
+  Fora dela (e sempre, com check_days vazio) roda a **rede de segurança nas horas
+  UTC configuradas** (`FeedsConfig.safety_hours_utc/0`, default 03:00 e 15:00 UTC,
+  editável em runtime, sem redeploy): âncoras de relógio, não intervalo à deriva.
   """
   def due?(%FeedSubscription{} = sub, now \\ DateTime.utc_now()) do
     if hot?(sub, now) do
@@ -260,20 +302,22 @@ defmodule Toscanini.Feeds do
     end
   end
 
-  # Rede de segurança: só dispara quando a hora UTC == safety_hour_utc e faz pelo
-  # menos ~meio dia desde o último check (evita disparo duplo e o caso de já ter
-  # sido checado num dia quente recente).
+  # Rede de segurança: só dispara numa hora-âncora e com pelo menos metade do
+  # intervalo entre âncoras desde o último check (FeedsConfig.safety_min_gap_hours/1;
+  # evita rechecar o que foi visto há pouco, ex.: no fim de um dia quente).
   defp safety_due?(sub, now) do
+    hours = Toscanini.FeedsConfig.safety_hours_utc()
+
     cond do
-      now.hour != Toscanini.FeedsConfig.safety_hour_utc() -> false
-      is_nil(sub.last_checked_at)                         -> true
-      true -> DateTime.diff(now, sub.last_checked_at, :hour) >= @safety_min_gap_hours
+      now.hour not in hours       -> false
+      is_nil(sub.last_checked_at) -> true
+      true -> DateTime.diff(now, sub.last_checked_at, :hour) >= Toscanini.FeedsConfig.safety_min_gap_hours(hours)
     end
   end
 
   defp hot?(%FeedSubscription{} = sub, now) do
     case FeedSubscription.check_days(sub) do
-      [] -> true
+      [] -> false
       days -> today_abbr(now) in Enum.map(days, &String.slice(&1, 0, 3))
     end
   end

@@ -99,7 +99,7 @@ defmodule Toscanini.Feeds.Backup do
 
   defp days(sub) do
     case FeedSubscription.check_days(sub) do
-      [] -> "sempre"
+      [] -> "nenhum"
       list -> Enum.join(list, ",")
     end
   end
@@ -180,6 +180,8 @@ defmodule Toscanini.Feeds.Backup do
     end
   end
 
+  defp days_parse("nenhum"), do: []
+  # Rótulo antigo de check_days vazio (antes da v0.2.56, quando vazio = hot sempre ligado).
   defp days_parse("sempre"), do: []
   defp days_parse(str), do: str |> String.split(",", trim: true) |> Enum.map(&String.trim/1)
 
