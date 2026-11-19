@@ -33,7 +33,7 @@ defmodule Toscanini.FeedSubscription do
     sub
     |> cast(attrs, @castable)
     |> validate_required([:source, :feed_ref])
-    |> validate_inclusion(:source, ["pocketcasts", "rss"])
+    |> validate_inclusion(:source, ["pocketcasts", "rss", "youtube"])
     |> unique_constraint([:source, :feed_ref], name: :feed_subscriptions_source_feed_ref_index)
   end
 

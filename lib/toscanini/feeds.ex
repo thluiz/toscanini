@@ -18,7 +18,7 @@ defmodule Toscanini.Feeds do
   alias Toscanini.{Repo, FeedSubscription, Batches, Pipeline}
   alias Toscanini.Feeds.Backup
   alias Toscanini.Pipeline.Dispatcher
-  alias Toscanini.Collectors.Pocketcasts
+  alias Toscanini.Collectors.{Pocketcasts, YoutubeFeed}
 
   @day_abbr {"mon", "tue", "wed", "thu", "fri", "sat", "sun"}
 
@@ -66,20 +66,24 @@ defmodule Toscanini.Feeds do
   # ---- Subscribe (watermark init, sem submeter) -----------------------------
 
   @doc """
-  Cria uma assinatura. Aceita `feed_ref` (podcast_uuid) ou `url` (de podcast/
-  episódio PocketCasts, da qual extrai o uuid). Faz um fetch inicial só pra
-  gravar o watermark e os headers de cache — **não submete nenhum episódio**.
+  Cria uma assinatura. Aceita `feed_ref` (podcast_uuid / channel id `UC…`) ou
+  `url` (de podcast/episódio PocketCasts, ou de canal/vídeo do YouTube). Sem
+  `source` explícito, URL de youtube.com/youtu.be ou `feed_ref` `UC…` viram
+  `"youtube"`. Faz um fetch inicial só pra gravar o watermark e os headers de
+  cache — **não submete nenhum episódio**.
+
+  `opts` repassa `:fetch`/`:runner` ao `YoutubeFeed` (seams de teste).
 
   Reescreve o `SUBSCRIPTIONS.md` ao final (`Feeds.Backup.sync/0`); `sync: false`
   pula isso (a restauração em lote não reescreve o arquivo).
   """
   def subscribe(attrs, opts \\ []) do
-    attrs = normalize_attrs(attrs)
+    attrs = attrs |> normalize_attrs() |> infer_source()
     # Sem check_days explícito → inferir a janela quente da cadência do feed no
     # priming (ver infer_check_days/2). check_days presente (mesmo []) é respeitado.
     infer_schedule? = not Map.has_key?(attrs, :check_days)
 
-    with {:ok, feed_ref} <- resolve_feed_ref(attrs) do
+    with {:ok, feed_ref} <- resolve_feed_ref(attrs, opts) do
       attrs = Map.put(attrs, :feed_ref, feed_ref)
 
       %FeedSubscription{id: Ecto.UUID.generate()}
@@ -87,7 +91,7 @@ defmodule Toscanini.Feeds do
       |> Repo.insert()
       |> case do
         {:ok, sub} ->
-          primed = prime_watermark(sub, infer_schedule?)
+          primed = prime_watermark(sub, infer_schedule?, opts)
           if Keyword.get(opts, :sync, true), do: Backup.sync()
           {:ok, primed}
 
@@ -98,11 +102,11 @@ defmodule Toscanini.Feeds do
 
   # Grava o watermark inicial = data do episódio mais recente atual (ou "agora"
   # se o feed falhar/vier vazio), garantindo que só o PRÓXIMO episódio entra.
-  defp prime_watermark(%FeedSubscription{source: "pocketcasts"} = sub, infer_schedule?) do
+  defp prime_watermark(%FeedSubscription{} = sub, infer_schedule?, opts) do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
 
     updates =
-      case Pocketcasts.fetch_podcast_episodes(sub.feed_ref) do
+      case fetch_episodes(sub, opts) do
         {:ok, %{episodes: episodes} = feed} ->
           {latest_dt, latest_uuid} = latest_episode(episodes)
 
@@ -131,7 +135,41 @@ defmodule Toscanini.Feeds do
     primed
   end
 
-  defp prime_watermark(sub, _infer_schedule?), do: sub
+  # ---- Despacho por source --------------------------------------------------
+
+  defp fetch_episodes(%FeedSubscription{source: "pocketcasts"} = sub, opts),
+    do: Pocketcasts.fetch_podcast_episodes(sub.feed_ref, Keyword.take(opts, [:etag, :last_modified]))
+
+  defp fetch_episodes(%FeedSubscription{source: "youtube"} = sub, opts),
+    do: YoutubeFeed.fetch_channel_episodes(sub.feed_ref, opts)
+
+  defp fetch_episodes(%FeedSubscription{source: source}, _opts), do: {:error, {:unsupported_source, source}}
+
+  defp episode_url(%FeedSubscription{source: "youtube"}, ep), do: YoutubeFeed.episode_url(ep["uuid"])
+  defp episode_url(%FeedSubscription{} = sub, ep), do: Pocketcasts.episode_url(sub.feed_ref, ep["uuid"])
+
+  # Nome do collector no mapa de pipelines.ex — coincide com o source.
+  defp collector(%FeedSubscription{source: source}), do: source
+
+  # YouTube: estreia (premiere) aparece no feed antes de o vídeo existir. Corta a
+  # lista (asc) no primeiro vídeo `upcoming?`: o watermark só avança até o último
+  # submetido e a estreia volta a ser "nova" na próxima checagem. Trade-off: segura
+  # também os vídeos publicados depois dela até ela ir ao ar.
+  defp hold_upcoming(%FeedSubscription{source: "youtube"} = sub, new, opts) do
+    {ready, held} = Enum.split_while(new, fn {ep, _dt} -> not YoutubeFeed.upcoming?(ep["uuid"], opts) end)
+
+    case held do
+      [{ep, _} | _] ->
+        Logger.info("[Feeds] #{sub.feed_ref}: estreia/live #{ep["uuid"]} ainda não exibida; segurando #{length(held)} vídeo(s)")
+
+      [] ->
+        :ok
+    end
+
+    ready
+  end
+
+  defp hold_upcoming(_sub, new, _opts), do: new
 
   # ---- Inferência da janela quente ------------------------------------------
 
@@ -253,17 +291,19 @@ defmodule Toscanini.Feeds do
   e avança o watermark. Devolve `{:ok, :no_change}` | `{:ok, {:submitted, n}}` |
   `{:error, reason}`.
   """
-  def check(%FeedSubscription{source: "pocketcasts"} = sub) do
-    now = DateTime.utc_now() |> DateTime.truncate(:second)
-    opts = [etag: sub.etag, last_modified: sub.last_modified]
+  def check(sub, opts \\ [])
 
-    case Pocketcasts.fetch_podcast_episodes(sub.feed_ref, opts) do
+  def check(%FeedSubscription{source: source} = sub, opts) when source in ["pocketcasts", "youtube"] do
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+    opts = Keyword.merge(opts, etag: sub.etag, last_modified: sub.last_modified)
+
+    case fetch_episodes(sub, opts) do
       {:not_modified, _} ->
         touch_checked(sub, now)
         {:ok, :no_change}
 
       {:ok, %{episodes: episodes} = feed} ->
-        new = new_episodes(episodes, sub.last_published_at)
+        new = sub |> hold_upcoming(new_episodes(episodes, sub.last_published_at), opts)
 
         base = %{
           etag:            feed[:etag],
@@ -275,7 +315,7 @@ defmodule Toscanini.Feeds do
           {:ok, _} = do_update(sub, base)
           {:ok, :no_change}
         else
-          urls = Enum.map(new, fn {ep, _dt} -> Pocketcasts.episode_url(sub.feed_ref, ep["uuid"]) end)
+          urls = Enum.map(new, fn {ep, _dt} -> episode_url(sub, ep) end)
           # Propaga a flag do feed para os params do pipeline. O AnnotateWorker lê
           # "auto_annotate" e faz no-op se falso.
           extra = %{"auto_annotate" => sub.auto_annotate}
@@ -288,10 +328,10 @@ defmodule Toscanini.Feeds do
           ref =
             case urls do
               [single] ->
-                "job #{submit_single(single, "pocketcasts", extra)}"
+                "job #{submit_single(single, collector(sub), extra)}"
 
               _ ->
-                {:ok, batch, _pid} = Batches.start_batch(urls, "pocketcasts", extra)
+                {:ok, batch, _pid} = Batches.start_batch(urls, collector(sub), extra)
                 "batch #{batch.id}"
             end
 
@@ -313,13 +353,32 @@ defmodule Toscanini.Feeds do
     end
   end
 
-  def check(%FeedSubscription{source: source}), do: {:error, {:unsupported_source, source}}
+  def check(%FeedSubscription{source: source}, _opts), do: {:error, {:unsupported_source, source}}
 
   # Submete um episódio avulso ao pipeline (sem batch). Mesmo caminho do
   # JobController: cria o Pipeline "queued" com os params e dispara o dispatcher.
   # Sem batch_id nos params, o NotifyWorker notifica só o episódio e não avança
   # nenhum batch nem manda resumo (ver NotifyWorker.notify_podcast).
+  #
+  # Dedup: se já existe pipeline não-falho com a mesma URL (ex.: submetida à mão
+  # pouco antes do check), devolve o id dele em vez de rodar de novo.
   defp submit_single(url, collector, extra_params) do
+    case existing_pipeline(url) do
+      nil -> insert_single(url, collector, extra_params)
+      id -> id
+    end
+  end
+
+  defp existing_pipeline(url) do
+    Repo.one(
+      from p in Pipeline,
+        where: like(p.params, ^"%#{url}%") and p.status != "failed",
+        limit: 1,
+        select: p.id
+    )
+  end
+
+  defp insert_single(url, collector, extra_params) do
     pipeline_id = Ecto.UUID.generate()
     params = Map.put(extra_params, "url", url)
 
@@ -380,14 +439,31 @@ defmodule Toscanini.Feeds do
 
   # ---- Helpers ---------------------------------------------------------------
 
-  defp resolve_feed_ref(%{feed_ref: ref}) when is_binary(ref) and ref != "", do: {:ok, ref}
+  defp resolve_feed_ref(%{feed_ref: ref}, _opts) when is_binary(ref) and ref != "", do: {:ok, ref}
 
-  defp resolve_feed_ref(%{url: url}) when is_binary(url) and url != "" do
+  defp resolve_feed_ref(%{source: "youtube", url: url}, opts) when is_binary(url) and url != "" do
+    YoutubeFeed.resolve_channel_id(url, opts)
+  end
+
+  defp resolve_feed_ref(%{url: url}, _opts) when is_binary(url) and url != "" do
     # Segue redirects (short links pca.st/CODE → pocketcasts.com/podcast/slug/uuid).
     Pocketcasts.resolve_podcast_uuid(url)
   end
 
-  defp resolve_feed_ref(_), do: {:error, :missing_feed_ref}
+  defp resolve_feed_ref(_, _opts), do: {:error, :missing_feed_ref}
+
+  # Sem source explícito: URL do YouTube ou feed_ref `UC…` → "youtube". O resto
+  # cai no default do schema ("pocketcasts").
+  @doc false
+  def infer_source(%{source: s} = attrs) when is_binary(s) and s != "", do: attrs
+
+  def infer_source(attrs) do
+    cond do
+      YoutubeFeed.channel_id?(attrs[:feed_ref]) -> Map.put(attrs, :source, "youtube")
+      YoutubeFeed.youtube_url?(attrs[:url]) -> Map.put(attrs, :source, "youtube")
+      true -> attrs
+    end
+  end
 
   @allowed_keys ~w(source feed_ref url title active auto_annotate check_days
                    hot_interval_min idle_interval_min)a

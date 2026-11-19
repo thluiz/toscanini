@@ -1,5 +1,34 @@
 # Changelog
 
+## [0.2.55] — 2026-11-19
+
+### Inscrição em canais do YouTube
+
+Canais do YouTube agora são assinados como os podcasts do Pocket Casts: cada vídeo longo novo entra sozinho no
+pipeline (collector `youtube`) e sai publicado no Vox. Sem backfill (watermark no vídeo mais recente) e
+`auto_annotate` desligado por padrão.
+
+- **`Collectors.YoutubeFeed`** — lê o Atom da playlist de vídeos longos (`UULF<id>`), então Shorts (só no feed
+  `channel_id=UC…`) e lives (playlist `UULV…`) ficam de fora. Nome do canal vem de `<author><name>` (o `<title>` do
+  feed é literalmente `Videos`). Parse com `:xmerl` (adicionado a `extra_applications`), sobre os bytes UTF-8 crus.
+  O feed não manda `ETag`/`Last-Modified`; o GET condicional fica só por simetria.
+- **Resolução do canal** — `/channel/UC…` sai direto; `@handle`, `/c/`, `/user/` e URLs de vídeo (`watch?v=`,
+  `youtu.be`, `/live/`) vão pelo `yt-dlp --flat-playlist`, imprimindo `playlist_channel_id` e `channel_id` (em modo
+  flat, página de canal só preenche o primeiro e vídeo só o segundo).
+- **Estreias** — aparecem no feed antes de o vídeo existir. `YoutubeFeed.upcoming?/2` (`--print live_status` com
+  `--ignore-no-formats-error`) e o check para no primeiro vídeo `is_upcoming`/`is_live`: o watermark só avança até
+  o último submetido, segurando também os vídeos posteriores até a estreia ir ao ar. Fail-open: erro/timeout do
+  yt-dlp conta como não-estreia, pra não congelar o canal em silêncio.
+- **`Feeds`** — `subscribe` infere `source: "youtube"` de URL youtube.com/youtu.be ou `feed_ref` `UC…`;
+  `prime_watermark/3` e `check/2` despacham por source (fetch, URL do episódio, collector). `rss` deixa de ficar
+  sem watermark no subscribe (cai no caminho de falha do fetch, watermark = agora). `FeedSubscription` aceita
+  `"youtube"`.
+- **Dedup no job avulso** — `submit_single` não cria pipeline se já existe um não-falho com a mesma URL (vídeo ou
+  episódio submetido à mão pouco antes do check). Vale também pro Pocket Casts.
+- **MCP `subscribe_feed`** — descrição cobre YouTube; `source` opcional repassado ao `POST /subscriptions`.
+- Testes: `test/toscanini/collectors/youtube_feed_test.exs`, `test/toscanini/feeds/youtube_check_test.exs`
+  (fixture `test/support/fixtures/youtube_feed.xml`).
+
 ## [0.2.54] — 2026-11-18
 
 ### Citação sem fonte verificável vira rascunho

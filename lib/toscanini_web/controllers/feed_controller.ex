@@ -104,5 +104,7 @@ defmodule ToscaniniWeb.FeedController do
 
   defp to_string_reason(:missing_feed_ref), do: "feed_ref or url is required"
   defp to_string_reason({:unsupported_source, s}), do: "unsupported source: #{s}"
+  defp to_string_reason(:not_youtube_url), do: "url is not a YouTube channel/video url"
+  defp to_string_reason(reason) when is_binary(reason), do: reason
   defp to_string_reason(reason), do: inspect(reason)
 end

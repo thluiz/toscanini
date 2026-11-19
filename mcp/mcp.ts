@@ -12,7 +12,7 @@
 //   wait_job         — Poll until job completes (default timeout 30min)
 //   wait_batch       — Poll until batch completes
 //   publish_podcast  — Publish episode from pre-processed JSON (skips collect/transcribe/summarize)
-//   subscribe_feed   — Subscribe to a podcast feed for auto-download of new episodes
+//   subscribe_feed   — Subscribe to a podcast feed or YouTube channel for auto-download of new episodes
 //   list_feeds       — List feed subscriptions
 //   check_feed_now   — Force a feed check now
 //   unsubscribe_feed — Remove a feed subscription
@@ -386,10 +386,13 @@ const TOOLS = [
   {
     name: "subscribe_feed",
     description:
-      "Subscribe to a podcast feed so Toscanini auto-downloads NEW episodes on a schedule. " +
+      "Subscribe to a podcast feed or a YouTube channel so Toscanini auto-downloads NEW episodes/videos on a schedule. " +
       "Backfill is off: only episodes published AFTER subscribing are processed (a watermark is " +
       "recorded at subscribe time). Provide either a PocketCasts URL (short pca.st/CODE links are " +
       "resolved once and only the podcast UUID is stored) or the podcast UUID directly via feed_ref. " +
+      "YouTube: pass a channel URL (@handle, /channel/UC..., /c/, /user/) or any video URL of the channel " +
+      "(source is inferred, the channel id UC... is stored); only long videos are followed (no Shorts, no lives), " +
+      "and a scheduled premiere holds the channel until it airs. " +
       "check_days sets the hot window (hourly polling on those weekdays); outside it a daily safety " +
       "poll runs. Conditional GET (ETag) keeps polling cheap.",
     inputSchema: {
@@ -397,11 +400,16 @@ const TOOLS = [
       properties: {
         url: {
           type: "string",
-          description: "PocketCasts podcast/episode URL (incl. short pca.st/CODE). Alternative to feed_ref.",
+          description: "PocketCasts podcast/episode URL (incl. short pca.st/CODE), or YouTube channel/video URL. Alternative to feed_ref.",
         },
         feed_ref: {
           type: "string",
-          description: "Podcast UUID (PocketCasts). Alternative to url; more robust than short links.",
+          description: "Podcast UUID (PocketCasts) or YouTube channel id (UC..., 24 chars). Alternative to url; more robust than short links.",
+        },
+        source: {
+          type: "string",
+          enum: ["pocketcasts", "youtube"],
+          description: "Feed source (optional). Inferred: YouTube URL or UC... feed_ref -> youtube; otherwise pocketcasts.",
         },
         title: {
           type: "string",
@@ -763,6 +771,7 @@ async function dispatch(
           const body: Record<string, unknown> = {};
           if (args.url) body.url = args.url;
           if (args.feed_ref) body.feed_ref = args.feed_ref;
+          if (args.source) body.source = args.source;
           if (args.title) body.title = args.title;
           if (args.check_days !== undefined) body.check_days = args.check_days;
           if (args.hot_interval_min !== undefined) body.hot_interval_min = args.hot_interval_min;
