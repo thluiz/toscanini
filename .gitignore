@@ -39,3 +39,9 @@ data/queue_schedules.json
 
 # Runtime feed config (overwritten by API)
 data/feeds_config.json
+
+# Runtime data dir (DB, DB backups, model_routing, gpu_cooldown, feeds/queue config)
+/data/
+
+# Local backups of versioned templates (e.g. priv/queue_schedules.json.bak-<ts>)
+priv/*.bak-*
