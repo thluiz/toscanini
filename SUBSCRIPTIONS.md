@@ -11,9 +11,9 @@ Restaurar: `mix ecto.migrate` num banco vazio e depois `mix toscanini.restore_su
 | #Provocast | pocketcasts | `cca71c70-d321-0137-1e20-0acc26574db2` | sim | não | thu | 60 | 1440 |
 | .NET Rocks! | pocketcasts | `2b369ce0-0426-012e-f9a0-00163e1b201c` | sim | não | wed,thu | 60 | 1440 |
 | 80,000 Hours Podcast | pocketcasts | `99d6aaa0-2e41-0135-52f9-452518e2d253` | sim | não | tue,wed,thu | 60 | 1440 |
-| AI News & Strategy Daily \| Nate B Jones | youtube | `UC0C-17n9iuUQPylguM1d-lQ` | sim | não | sun | 60 | 1440 |
+| AI News & Strategy Daily \| Nate B Jones | youtube | `UC0C-17n9iuUQPylguM1d-lQ` | sim | não | mon,tue,wed,thu,fri,sat,sun | 60 | 1440 |
 | Anarchist Essays | pocketcasts | `308d9020-e266-0138-e7c9-0acc26574db2` | sim | não | mon | 60 | 1440 |
-| Antinomia | pocketcasts | `890a4120-0306-0138-9f4f-0acc26574db2` | sim | não | sempre | 60 | 1440 |
+| Antinomia | pocketcasts | `890a4120-0306-0138-9f4f-0acc26574db2` | sim | não | nenhum | 60 | 1440 |
 | Aqui a música toca. \| Osesp | pocketcasts | `f6492aa0-5205-013d-1965-0acc26574db2` | sim | não | tue | 60 | 1440 |
 | Atila Iamarino | youtube | `UCSTlOTcyUmzvhQi6F8lFi5w` | sim | não | wed,fri | 60 | 1440 |
 | Behind the Bastards | pocketcasts | `d9c015b0-255d-0136-c266-7d73a919276a` | sim | não | tue,thu,sat | 60 | 1440 |
@@ -24,16 +24,16 @@ Restaurar: `mix ecto.migrate` num banco vazio e depois `mix toscanini.restore_su
 | Calma Urgente | pocketcasts | `2a566eb0-ddce-013c-5d0d-0acc26574db2` | sim | sim | mon,tue | 60 | 1440 |
 | Chutando a Escada | pocketcasts | `0bdfc250-55b6-0134-ec37-0d50f522381b` | sim | não | thu | 60 | 1440 |
 | Cinemático | pocketcasts | `6be6ad10-1938-0135-52f8-452518e2d253` | sim | não | tue,thu | 60 | 1440 |
-| Clóvis de Barros | youtube | `UCPfEa4hhzVGOxt05mWKHvZQ` | sim | não | sun | 60 | 1440 |
-| Computação Crítica por Victor Osório | youtube | `UC6g6eok10NJGYgenHO-0Oew` | sim | não | sun | 60 | 1440 |
-| Crise Crise Crise | pocketcasts | `15f3f0a0-5023-013c-f72c-0acc26574db2` | sim | não | mon,wed,thu,fri | 60 | 1440 |
+| Clóvis de Barros | youtube | `UCPfEa4hhzVGOxt05mWKHvZQ` | sim | não | tue,wed,thu,fri,sun | 60 | 1440 |
+| Computação Crítica por Victor Osório | youtube | `UC6g6eok10NJGYgenHO-0Oew` | sim | não | nenhum | 60 | 1440 |
+| Crise Crise Crise | pocketcasts | `15f3f0a0-5023-013c-f72c-0acc26574db2` | sim | não | nenhum | 60 | 1440 |
 | Desculpa o Transtorno | pocketcasts | `fb595340-17f7-013f-8f7c-0affcf9e76dd` | sim | não | mon | 60 | 1440 |
 | Developer Tea | pocketcasts | `cbe9b6c0-7da4-0132-e6ef-5f4c86fd3263` | sim | não | wed,thu | 60 | 1440 |
 | Duas e Tanto | pocketcasts | `bbba0d00-1c7f-013e-8aec-0e8fd7e33bcf` | sim | não | tue,thu | 60 | 1440 |
-| Elefantes na Neblina | pocketcasts | `076b7250-7b38-0138-edfa-0acc26574db2` | sim | não | sempre | 60 | 1440 |
+| Elefantes na Neblina | pocketcasts | `076b7250-7b38-0138-edfa-0acc26574db2` | sim | não | nenhum | 60 | 1440 |
 | Elixir Wizards | pocketcasts | `722afb10-1b49-0137-f265-1d245fc5f9cf` | sim | não | thu | 60 | 1440 |
 | Escafandro | pocketcasts | `ff036de0-0f90-0137-f265-1d245fc5f9cf` | sim | não | wed | 60 | 1440 |
-| Fabio Akita | youtube | `UCib793mnUOhWymCh2VJKplQ` | sim | não | sun | 60 | 1440 |
+| Fabio Akita | youtube | `UCib793mnUOhWymCh2VJKplQ` | sim | não | nenhum | 60 | 1440 |
 | Falando de História | pocketcasts | `3907a740-0b7e-0139-41b2-0acc26574db2` | sim | não | mon | 60 | 1440 |
 | Falando nIsso | pocketcasts | `d19dac70-4f6c-0139-3399-0acc26574db2` | sim | não | tue,fri | 60 | 1440 |
 | Filosofia Pop | pocketcasts | `56aa96e0-d74d-0132-0356-059c869cc4eb` | sim | não | mon | 60 | 1440 |
@@ -48,25 +48,25 @@ Restaurar: `mix ecto.migrate` num banco vazio e depois `mix toscanini.restore_su
 | Interesting Times with Ross Douthat | pocketcasts | `045f3aa0-aa6a-0136-7b93-27f978dac4db` | sim | não | thu | 60 | 1440 |
 | Introvertendo - Autismo por Autistas | pocketcasts | `26c0a450-3cc1-0136-fa7b-0fe84b59566d` | sim | não | fri | 60 | 1440 |
 | Isso não é uma sessão de análise, com Vera Iaconelli | pocketcasts | `e6d02e00-646b-013e-ba85-0acc26574db2` | sim | não | tue,thu | 60 | 1440 |
-| Jornada da Odisseia | pocketcasts | `2b585cb0-bc20-013f-55d8-0affcb2f3ff3` | sim | não | sempre | 60 | 1440 |
-| José Kobori | youtube | `UCOKSOW5uJHdW7Edz37mvAFw` | sim | não | sun | 60 | 1440 |
+| Jornada da Odisseia | pocketcasts | `2b585cb0-bc20-013f-55d8-0affcb2f3ff3` | sim | não | nenhum | 60 | 1440 |
+| José Kobori | youtube | `UCOKSOW5uJHdW7Edz37mvAFw` | sim | não | mon,tue,wed,thu,fri,sat,sun | 60 | 1440 |
 | Kritikê Podcast | pocketcasts | `2daebee0-c8b7-0139-56b6-0acc26574db2` | sim | não | mon,tue,fri | 60 | 1440 |
 | La Mezcla | pocketcasts | `90a5cdd0-e388-013e-f843-022038d1b2e1` | sim | não | mon | 60 | 1440 |
 | Lado B do Rio | pocketcasts | `20e7d0d0-4d5c-0134-ec0b-0d50f522381b` | sim | não | tue | 60 | 1440 |
 | Lambda3 Podcast | pocketcasts | `2c13caf0-f08d-0133-9c6b-59d98c6b72b8` | sim | não | fri | 60 | 1440 |
 | Lenny's Podcast: Product \| Career \| Growth | pocketcasts | `aff3edd0-c8a4-013a-d954-0acc26574db2` | sim | não | sun | 60 | 1440 |
 | Mamilos | pocketcasts | `8e5629f0-512e-0132-cf87-5f4c86fd3263` | sim | não | tue | 60 | 1440 |
-| mano deyvin | youtube | `UC1VZDEtGNxfQzh7EYcD2frg` | sim | não | sun | 60 | 1440 |
+| mano deyvin | youtube | `UC1VZDEtGNxfQzh7EYcD2frg` | sim | não | mon,tue,wed,thu,fri,sat,sun | 60 | 1440 |
 | Matt Pocock | youtube | `UCswG6FSbgZjbWtdf_hMLaow` | sim | não | mon,wed,thu | 60 | 1440 |
-| Medo e Delírio em Brasília | pocketcasts | `888d5760-4c1b-0138-9785-0acc26574db2` | sim | não | wed,thu,fri,sat | 60 | 1440 |
+| Medo e Delírio em Brasília | pocketcasts | `888d5760-4c1b-0138-9785-0acc26574db2` | sim | não | thu,sat | 60 | 1440 |
 | MIDCast Política | pocketcasts | `459b62a0-ef36-0135-c25e-7d73a919276a` | sim | não | mon,sun | 60 | 1440 |
 | Mitografias | pocketcasts | `46092170-50de-0136-fa7c-0fe84b59566d` | sim | não | thu | 60 | 1440 |
 | Mo Bitar | youtube | `UCAwT-7B6StW_xzXPku6v7MQ` | sim | não | mon,tue,wed | 60 | 1440 |
 | Modern CTO | pocketcasts | `509a1ca0-c507-0135-9e60-5bb073f92b78` | sim | não | mon,thu | 60 | 1440 |
 | Naruhodo | pocketcasts | `3f602eb0-4ae0-0134-ebfa-0d50f522381b` | sim | não | mon | 60 | 1440 |
-| NerdCast | pocketcasts | `7622ef30-3f20-0131-77d1-723c91aeae46` | sim | não | sempre | 60 | 1440 |
+| NerdCast | pocketcasts | `7622ef30-3f20-0131-77d1-723c91aeae46` | sim | não | fri | 60 | 1440 |
 | Noites Gregas | pocketcasts | `0e44cbe0-0874-0138-9f63-0acc26574db2` | sim | não | fri | 60 | 1440 |
-| NORMOSE | youtube | `UCqBY-VQ2BxHOWnVpuC7swrw` | sim | não | sun | 60 | 1440 |
+| NORMOSE | youtube | `UCqBY-VQ2BxHOWnVpuC7swrw` | sim | não | nenhum | 60 | 1440 |
 | Nosso Podcast de Cinema | pocketcasts | `76eb6ca0-9a1f-0139-c12b-0acc26574db2` | sim | não | thu | 60 | 1440 |
 | O Assunto | pocketcasts | `9cc32e40-a9cb-0137-fae6-0acc26574db2` | sim | não | mon,tue,wed,thu,fri | 60 | 1440 |
 | O Princípio da Inquietação | pocketcasts | `871a4f30-26e1-013f-2ec2-0e872f6a2b21` | sim | não | thu | 60 | 1440 |
@@ -83,7 +83,7 @@ Restaurar: `mix ecto.migrate` num banco vazio e depois `mix toscanini.restore_su
 | Scott & Mark Learn To... | pocketcasts | `ef796ea0-6892-013d-aba9-0affd8d03709` | sim | não | wed | 60 | 1440 |
 | Silicon Valley Girl: AI, Tech and Career Growth | pocketcasts | `d3ebe030-29f4-013e-1bdc-0acc26574db2` | sim | não | tue,fri | 60 | 1440 |
 | Tech Lead Journal | pocketcasts | `952099f0-a7bc-0138-e686-0acc26574db2` | sim | não | mon | 60 | 1440 |
-| Tecnologia e Classe (TeClas) | youtube | `UCYVrkMZdrjq5eICOG6Rxiwg` | sim | não | sun | 60 | 1440 |
+| Tecnologia e Classe (TeClas) | youtube | `UCYVrkMZdrjq5eICOG6Rxiwg` | sim | não | mon,tue,wed,thu,fri | 60 | 1440 |
 | The Bike Shed | pocketcasts | `ce1490c0-4406-0132-c909-5f4c86fd3263` | sim | não | tue | 60 | 1440 |
 | The Ezra Klein Show | pocketcasts | `8535a4e0-3c50-0139-3339-0acc26574db2` | sim | não | tue,wed | 60 | 1440 |
 | The Gray Area with Sean Illing | pocketcasts | `1d3ce9a0-ae3d-0133-2e33-6dc413d6d41d` | sim | não | mon,fri | 60 | 1440 |
@@ -91,7 +91,7 @@ Restaurar: `mix ecto.migrate` num banco vazio e depois `mix toscanini.restore_su
 | The Productivity Show | pocketcasts | `e9a4aa60-7486-0132-e1d6-5f4c86fd3263` | sim | não | mon,wed | 60 | 1440 |
 | The Stack Overflow Podcast | pocketcasts | `2c22bfa0-cecf-0130-37a2-723c91aeae46` | sim | não | tue,fri | 60 | 1440 |
 | The Tech Report | pocketcasts | `48f7dbe0-f123-013e-8105-0afffacbab17` | sim | não | mon,wed,thu | 60 | 1440 |
-| Theo - t3․gg | youtube | `UCbRP3c757lWg9M-U7TyEkXA` | sim | não | sun | 60 | 1440 |
+| Theo - t3․gg | youtube | `UCbRP3c757lWg9M-U7TyEkXA` | sim | não | mon,tue,wed,thu,fri | 60 | 1440 |
 | Think Fast Talk Smart: Communication Techniques | pocketcasts | `801704e0-1ee9-0138-9fc1-0acc26574db2` | sim | não | mon,thu | 60 | 1440 |
 | Uma Tupá no Tempo | pocketcasts | `d0517fe0-8860-013e-59fd-0affef269edf` | sim | não | mon,sat | 60 | 1440 |
 | Unexplainable | pocketcasts | `e7f5ba60-584b-0139-33c5-0acc26574db2` | sim | não | mon,wed | 60 | 1440 |
