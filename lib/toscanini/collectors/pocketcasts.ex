@@ -15,15 +15,17 @@ defmodule Toscanini.Collectors.Pocketcasts do
 
     with {:ok, meta}      <- fetch_metadata(url),
          {:ok, mp3_path}  <- download_audio(meta.audio_url, outdir, meta.slug),
+         meta             = with_measured_duration(meta, mp3_path),
          {:ok, json_path} <- write_json(outdir, meta) do
       {:ok, %{
-        "mp3"           => mp3_path,
-        "json"          => json_path,
-        "slug"          => meta.slug,
-        "title"         => meta.title,
-        "podcast"       => meta.podcast,
-        "duration_secs" => meta.duration_secs,
-        "source_url"    => url
+        "mp3"                => mp3_path,
+        "json"               => json_path,
+        "slug"               => meta.slug,
+        "title"              => meta.title,
+        "podcast"            => meta.podcast,
+        "duration_secs"      => meta.duration_secs,
+        "duration_secs_meta" => meta.duration_secs_meta,
+        "source_url"         => url
       }}
     end
   end
@@ -289,6 +291,12 @@ defmodule Toscanini.Collectors.Pocketcasts do
     }
 
     if audio_url, do: {:ok, meta}, else: {:error, "episódio sem URL de áudio"}
+  end
+
+  # The API duration is feed metadata and can be wrong (see Toscanini.AudioDuration).
+  defp with_measured_duration(meta, mp3_path) do
+    measured = Toscanini.AudioDuration.effective(meta.duration_secs, mp3_path, meta.slug)
+    Map.merge(meta, %{duration_secs: measured, duration_secs_meta: meta.duration_secs})
   end
 
   defp download_audio(audio_url, outdir, slug) do

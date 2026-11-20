@@ -4,7 +4,7 @@ defmodule Toscanini.Workers.TranscribeWorker do
   require Logger
 
   alias Toscanini.{Repo, Pipeline, Pipeline.Dispatcher, TranscriptCheck, Clients.GossipGate}
-  alias Toscanini.{GpuCooldown, Scheduler}
+  alias Toscanini.{AudioDuration, GpuCooldown, Scheduler}
 
   @min_chars_per_sec 3
 
@@ -17,7 +17,8 @@ defmodule Toscanini.Workers.TranscribeWorker do
     json_path     = collect["json"]
     json_data     = json_path |> File.read!() |> Jason.decode!()
     transcript    = json_data["transcript"]
-    duration_secs = collect["duration_secs"] || 0
+    audio_path    = collect["audio"] || collect["mp3"]
+    duration_secs = AudioDuration.effective(collect["duration_secs"], audio_path, pid)
     force         = params["force_retranscribe"] == true
 
     if not force and valid_transcript?(transcript, duration_secs) do
@@ -25,7 +26,6 @@ defmodule Toscanini.Workers.TranscribeWorker do
       Dispatcher.advance(pid)
       :ok
     else
-      audio_path = collect["audio"] || collect["mp3"]
       run_transcription(pipeline, audio_path, json_path, json_data, duration_secs)
     end
   end

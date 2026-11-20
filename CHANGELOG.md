@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.2.57] — 2026-11-20
+
+### Duração medida no áudio, não no metadado do feed
+
+O Filosofia Pop #224 foi rejeitado duas vezes como "transcrição truncada: termina em 3378s de 202740s (2%)". A
+transcrição estava completa: a API do Pocket Casts devolve `duration: 202740` para um MP3 de 3379s (provável "56:19"
+lido como h:m na origem). O mesmo número fazia o `valid_transcript?` exigir 60× os caracteres e iria para o JSON
+publicado como episódio de 56h.
+
+- **`Toscanini.AudioDuration`** — mede o arquivo com `ffprobe` (timeout 30s); se falhar, usa o metadado. Divergência
+  acima de 10% entre os dois vai para o log (`[AudioDuration] ...`).
+- **Collector Pocket Casts** — mede o MP3 logo após o download. `duration_secs` passa a ser o valor medido;
+  o da API fica em `duration_secs_meta` (resultado do `collect`).
+- **`TranscribeWorker`** — mede de novo antes do `valid_transcript?` e do `TranscriptCheck`, o que cobre pipelines
+  coletados antes desta versão e qualquer outro collector. Limiares do `TranscriptCheck` inalterados.
+- Testes: `audio_duration_test.exs` (inclui medição de um MP3 gerado com `ffmpeg`).
+
 ## [0.2.56] — 2026-11-19
 
 ### Janela quente só para dias fixos ou programa diário; rede de segurança 2×/dia
