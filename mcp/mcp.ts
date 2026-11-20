@@ -68,6 +68,13 @@ const TOOLS = [
           type: "boolean",
           description: "Force re-transcription even if transcript already exists",
         },
+        accept_duration_mismatch: {
+          type: "boolean",
+          description:
+            "Process even if the downloaded audio duration diverges from the feed " +
+            "(job failed with 'duração divergente': audio < 90% or > 3x the feed). " +
+            "Use only after checking the audio is complete; resubmitting already re-downloads it.",
+        },
         private: {
           type: "boolean",
           description: "Private content: written to vox-private-content, never to the public vox-content",
@@ -250,7 +257,9 @@ const TOOLS = [
       "List parked pipelines: work the server couldn't finish alone, waiting for Claude Code on the author's machine. " +
       "reason 'browser' = capture the page text in Claude in Chrome and resume_parked with it; " +
       "'audit_red' = show findings to the author, then resume (optionally with related_notes) or dismiss; " +
-      "'audit_unavailable' = resume when ghost-audit is back; 'slug_conflict' = usually dismiss.",
+      "'audit_unavailable' = resume when ghost-audit is back; 'slug_conflict' = usually dismiss; " +
+      "'save_failed' = compose went fine but the save failed (timeout/502): resume_parked with no text/related_notes " +
+      "retries the save of the same operation (no new compose, valid until expires_at; expired, it recomposes).",
     inputSchema: {
       type: "object",
       properties: {
@@ -262,7 +271,9 @@ const TOOLS = [
     name: "resume_parked",
     description:
       "Resume a parked pipeline. For a webclip, pass the page text captured in the browser (text + title) " +
-      "and/or related_notes ([{slug, title, hint?}]); it recomposes and the rest of the flow (save, quotes, notify) runs server-side.",
+      "and/or related_notes ([{slug, title, hint?}]); it recomposes and the rest of the flow (save, quotes, notify) runs server-side. " +
+      "A webclip parked 'save_failed', or failed at the save step, resumed with no text/related_notes retries the save " +
+      "of its composed operation instead of recomposing.",
     inputSchema: {
       type: "object",
       properties: {
@@ -650,6 +661,7 @@ async function dispatch(
           const body: Record<string, unknown> = { url: args.url };
           if (args.collector) body.collector = args.collector;
           if (args.force_retranscribe !== undefined) body.force_retranscribe = args.force_retranscribe;
+          if (args.accept_duration_mismatch !== undefined) body.accept_duration_mismatch = args.accept_duration_mismatch;
           if (args.private !== undefined) body.private = args.private;
           resultData = await toscaniniPost(base, "/jobs", body);
 

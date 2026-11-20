@@ -18,6 +18,9 @@ passaria calado. Agora cada checagem tem sua referência.
 - Pipelines anteriores à 0.2.57 usam `collect.duration_secs` como valor do feed.
 - Divergência dentro da faixa aceita vai para o log em nível `info` (era `warning`).
 - `reject_degenerate/2` virou `reject/3`, com o título do aviso como parâmetro.
+- **MCP `submit_job`** aceita `accept_duration_mismatch` (antes o tool só repassava `url`, `collector`,
+  `force_retranscribe` e `private`). `mcp/mcp.ts` sincronizado com a cópia em produção
+  (`services/toscanini-mcp/mcp.ts`), que tinha as descrições de `save_failed` da 0.2.53 fora do git.
 
 ## [0.2.57] — 2026-11-20
 
