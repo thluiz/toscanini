@@ -18,8 +18,22 @@ defmodule Toscanini.Workers.TranscribeWorker do
     json_data     = json_path |> File.read!() |> Jason.decode!()
     transcript    = json_data["transcript"]
     audio_path    = collect["audio"] || collect["mp3"]
-    duration_secs = AudioDuration.effective(collect["duration_secs"], audio_path, pid)
+    # Feed duration: before 0.2.57 `duration_secs` was the feed value itself.
+    feed_secs     = collect["duration_secs_meta"] || collect["duration_secs"]
+    measured      = AudioDuration.probe(audio_path)
+    duration_secs = AudioDuration.reconcile(feed_secs, measured)
     force         = params["force_retranscribe"] == true
+
+    with {:mismatch, _ratio} <- AudioDuration.compare(feed_secs, measured),
+         false <- params["accept_duration_mismatch"] == true do
+      reject(pipeline, AudioDuration.mismatch_message(feed_secs, measured), "duração do áudio divergente do feed")
+    else
+      _ -> transcribe_or_skip(pipeline, params, transcript, duration_secs, force, audio_path, json_path, json_data)
+    end
+  end
+
+  defp transcribe_or_skip(pipeline, _params, transcript, duration_secs, force, audio_path, json_path, json_data) do
+    pid = pipeline.id
 
     if not force and valid_transcript?(transcript, duration_secs) do
       Pipeline.save_result(pipeline, "transcribe", %{"skipped" => true, "reason" => "existing transcript"})
@@ -80,7 +94,7 @@ defmodule Toscanini.Workers.TranscribeWorker do
                     :ok
 
                   {:error, reason} ->
-                    reject_degenerate(pipeline, reason)
+                    reject(pipeline, reason, "transcrição rejeitada")
                 end
               end
 
@@ -130,12 +144,12 @@ defmodule Toscanini.Workers.TranscribeWorker do
   # Retentar não adianta (o Whisper repete o mesmo resultado e cada rodada custa
   # até ~40min de CPU): falha o pipeline na hora e avisa. O transcript no JSON
   # fica intocado, então nada degenerado chega ao summarize/Vox.
-  defp reject_degenerate(pipeline, reason) do
+  defp reject(pipeline, reason, what) do
     Logger.warning("[TranscribeWorker] #{pipeline.id}: #{reason}")
     Pipeline.fail(pipeline, reason)
 
     msg = """
-    <b>⚠️ Toscanini — transcrição rejeitada</b>
+    <b>⚠️ Toscanini — #{what}</b>
 
     <b>Pipeline:</b> <code>#{pipeline.id}</code>
     <b>Episódio:</b> #{html_escape(Pipeline.get_results(pipeline)["collect"]["title"] || "—")}

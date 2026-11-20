@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.2.58] — 2026-11-20
+
+### Duração divergente do feed vira erro específico, com override
+
+A 0.2.57 passava a confiar sempre no áudio medido, o que tirava o controle de qualidade do download: um MP3 cortado
+passaria calado. Agora cada checagem tem sua referência.
+
+- **Checagem do download** (`AudioDuration.compare/2`, no início do `TranscribeWorker`) — o feed é a referência.
+  Áudio abaixo de 90% do feed (download incompleto?) ou acima de 3× (arquivo errado?) falha o pipeline antes do
+  whisper com `duração divergente: áudio Xs, feed Ys (Z%)` e avisa pelo GossipGate. Reenviar com
+  `accept_duration_mismatch: true` força o processamento (o reenvio baixa de novo, o que já corrige um download
+  cortado). Tolerância calibrada numa varredura de 1134 episódios coletados: anúncios dinâmicos deixam o áudio até
+  ~1,7× o feed, arquivos mono 2×; áudio menor que o feed só no #224.
+- **Checagem da transcrição** — o áudio medido segue como referência (`reconcile/2`), já que é o que o whisper
+  transcreveu. Sem `ffprobe`, vale o metadado e nada bloqueia.
+- Pipelines anteriores à 0.2.57 usam `collect.duration_secs` como valor do feed.
+- Divergência dentro da faixa aceita vai para o log em nível `info` (era `warning`).
+- `reject_degenerate/2` virou `reject/3`, com o título do aviso como parâmetro.
+
 ## [0.2.57] — 2026-11-20
 
 ### Duração medida no áudio, não no metadado do feed

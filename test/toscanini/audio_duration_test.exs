@@ -33,6 +33,44 @@ defmodule Toscanini.AudioDurationTest do
     end
   end
 
+  describe "compare/2 (download check, feed is the reference)" do
+    test "audio far shorter than feed is a mismatch (#224, or an incomplete download)" do
+      assert {:mismatch, r} = AudioDuration.compare(202_740, {:ok, 3380})
+      assert r < 0.1
+    end
+
+    test "audio slightly shorter than feed passes" do
+      assert AudioDuration.compare(3723, {:ok, 3500}) == :ok
+    end
+
+    test "audio below 90% of feed is a mismatch" do
+      assert {:mismatch, _} = AudioDuration.compare(4000, {:ok, 3500})
+    end
+
+    test "longer audio from ad insertion and mono files passes" do
+      assert AudioDuration.compare(785, {:ok, 1362}) == :ok
+      assert AudioDuration.compare(1683, {:ok, 3366}) == :ok
+    end
+
+    test "audio over 3x the feed is a mismatch (wrong file?)" do
+      assert {:mismatch, _} = AudioDuration.compare(600, {:ok, 2000})
+    end
+
+    test "nothing to compare passes" do
+      assert AudioDuration.compare(nil, {:ok, 3380}) == :ok
+      assert AudioDuration.compare(0, {:ok, 3380}) == :ok
+      assert AudioDuration.compare(3723, :error) == :ok
+    end
+
+    test "message names both durations and the override" do
+      msg = AudioDuration.mismatch_message(202_740, {:ok, 3380})
+      assert msg =~ "duração divergente"
+      assert msg =~ "3380s"
+      assert msg =~ "202740s"
+      assert msg =~ "accept_duration_mismatch"
+    end
+  end
+
   describe "parse/1" do
     test "rounds ffprobe output" do
       assert AudioDuration.parse("3379.748571\n") == {:ok, 3380}
