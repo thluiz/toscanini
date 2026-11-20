@@ -1,5 +1,38 @@
 # Changelog
 
+## [0.2.60] — 2026-11-20
+
+### Fila de transcrição com lanes: lotes e avulsos revezam
+
+Um lote de 199 episódios estava com 0 concluídos após 7 horas. A fila `:transcribe` era FIFO puro, o lote é serial
+(um item em voo) e cada item novo entrava no fim da fila, atrás dos 20 a 30 avulsos que os feeds despejam de hora em
+hora: o lote avançava um episódio por drenagem completa da fila (meses para terminar).
+
+- **`Toscanini.TranscribeFeeder`** (novo) — portão da fila. O `Dispatcher` insere o job de transcribe em `scheduled`
+  com `scheduled_at` em 2999 (o Stager do Oban nunca o libera sozinho) e `meta.lane` (`general` para avulso, o
+  `batch_id` para item de lote). Quando um slot abre, o feeder escolhe a lane servida há mais tempo entre as que têm
+  candidato pronto e libera o candidato mais antigo dela (FIFO por id dentro da lane). Lane sem candidato não conta:
+  sem disputa, quem tem trabalho leva todos os slots. Último despacho por lane = `MAX(COALESCE(attempted_at,
+  scheduled_at))` dos jobs já liberados, sem estado novo (sobrevive a restart). Slots livres = limite da janela do
+  `Scheduler` menos jobs `executing` e `available`; o Oban continua impondo a concorrência real, o portão só manda na
+  ordem.
+- **Gatilhos** — telemetria `[:oban, :job, :stop | :exception]` da fila transcribe, inserção de job novo no
+  `Dispatcher`, e `Workers.TranscribeFeedWorker` no cron a cada minuto (cobre a mudança de janela, que abre slot sem
+  nenhum job terminar).
+- **Boot** — `TranscribeFeeder` entra na árvore de supervisão depois do `ObanRescue` e antes do Oban: todo transcribe
+  `available` (da versão anterior, ou resgatado de um restart) volta ao portão com a lane tirada do pipeline, e o feeder
+  libera por lane. Testado contra cópia do banco de produção: 31 avulsos + 1 item de lote adotados, lote liberado
+  primeiro.
+- **`POST /pipelines/:id/prioritize`** — além de `priority = -1`, marca `meta.prioritized`; no portão sai antes de
+  qualquer lane. Passa a valer para jobs `available` e `scheduled`.
+- **`GET /status`** — `transcribe.queued` conta o portão; `next_transcribe` segue a ordem prevista de liberação; novos
+  `queue` (cada job à espera: `title`, `lane`, `state` released/gated, `prioritized`) e `lanes` (`waiting`,
+  `executing`, `last_served_at` por lane); `executing[].lane`.
+- Testes: `test/toscanini/transcribe_feeder_test.exs` (seleção pura, banco, adopt, Dispatcher).
+
+Pré-coleta dos itens do lote (hoje o item seguinte só baixa quando o anterior publica, o que deixa a lane do lote vazia
+por alguns minutos a cada item) fica para a próxima versão.
+
 ## [0.2.59] — 2026-11-20
 
 ### Lotes ativos no `GET /status`

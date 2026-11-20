@@ -1,5 +1,5 @@
 defmodule Toscanini.Pipeline.Dispatcher do
-  alias Toscanini.{Repo, Pipeline}
+  alias Toscanini.{Repo, Pipeline, TranscribeFeeder}
   alias Toscanini.Workers
 
   @steps %{
@@ -69,11 +69,23 @@ defmodule Toscanini.Pipeline.Dispatcher do
     |> Pipeline.changeset(%{current_step: to_string(step), status: "running"})
     |> Repo.update!()
 
-    worker.new(%{"pipeline_id" => pipeline.id}, queue: queue, priority: priority(step))
+    opts = [queue: queue, priority: priority(step)] ++ gate_opts(pipeline, step)
+
+    worker.new(%{"pipeline_id" => pipeline.id}, opts)
     |> Oban.insert!()
+
+    # Job novo no portão: se há slot livre, entra já, sem esperar o cron.
+    if step == :transcribe, do: TranscribeFeeder.run()
 
     :ok
   end
+
+  # transcribe não entra direto na fila: fica no portão do TranscribeFeeder, que
+  # escolhe por lane (geral x lotes) quem ocupa o próximo slot do whisper.
+  defp gate_opts(pipeline, :transcribe),
+    do: TranscribeFeeder.gate_opts(TranscribeFeeder.lane_for(pipeline))
+
+  defp gate_opts(_pipeline, _step), do: []
 
   @doc """
   Oban priority of a step (0 runs first). In the serial `:webclip` queue a

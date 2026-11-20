@@ -33,10 +33,12 @@ config :toscanini, Oban,
     # cada assinatura por janela quente/idle, então isto é barato (conditional GET).
     # Retenção: 1×/dia (04:30 UTC) apaga áudio local já arquivado no cold há >N dias.
     # O worker é auto-gated (enabled? + backlog_done + dry_run), então é no-op por padrão.
+    # TranscribeFeed: rede de segurança do portão da fila de transcrição (1×/min).
     {Oban.Plugins.Cron,
      crontab: [
        {"0 * * * *", Toscanini.Workers.FeedSweepWorker},
-       {"30 4 * * *", Toscanini.Workers.RetentionSweepWorker}
+       {"30 4 * * *", Toscanini.Workers.RetentionSweepWorker},
+       {"* * * * *", Toscanini.Workers.TranscribeFeedWorker}
      ]}
   ]
 

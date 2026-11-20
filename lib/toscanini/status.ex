@@ -5,16 +5,20 @@ defmodule Toscanini.Status do
   único snapshot, consumido pelo endpoint de status e pelo relatório horário.
   """
   import Ecto.Query
-  alias Toscanini.{Repo, Pipeline}
+  alias Toscanini.{Repo, Pipeline, TranscribeFeeder}
 
   def snapshot do
+    waiting = TranscribeFeeder.waiting()
+
     %{
       totals:          totals(),
       steps:           running_steps(),
       done_last_hour:  done_last_hour(),
       recent_failures: recent_failures(),
-      transcribe:      transcribe_status(),
-      next_transcribe: next_transcribe(),
+      transcribe:      transcribe_status(waiting),
+      next_transcribe: next_transcribe(waiting),
+      queue:           queue_entries(waiting),
+      lanes:           lanes(waiting),
       executing:       executing_jobs(),
       batches:         active_batches()
     }
@@ -81,36 +85,66 @@ defmodule Toscanini.Status do
     |> Enum.map(&%{&1 | error: String.slice(&1.error || "", 0, 80)})
   end
 
-  # oban_jobs não tem schema no app -> SQL cru, como PipelineController.prioritize
-  defp transcribe_status do
-    sql = """
-    SELECT state, COUNT(*) FROM oban_jobs
-    WHERE worker LIKE '%TranscribeWorker' AND state IN ('executing','available')
-    GROUP BY state
-    """
-
-    {:ok, %{rows: rows}} = Repo.query(sql)
-    counts = Map.new(rows, fn [state, n] -> {state, n} end)
-    %{active: Map.get(counts, "executing", 0), queued: Map.get(counts, "available", 0)}
+  # Fila de transcrição como o TranscribeFeeder a vê: liberados + no portão.
+  # oban_jobs não tem schema no app -> SQL cru para o que o feeder não expõe.
+  defp transcribe_status(waiting) do
+    sql = "SELECT COUNT(*) FROM oban_jobs WHERE worker LIKE '%TranscribeWorker' AND state = 'executing'"
+    {:ok, %{rows: [[active]]}} = Repo.query(sql)
+    %{active: active, queued: length(waiting)}
   end
 
-  defp next_transcribe(limit \\ 5) do
-    sql = """
-    SELECT p.results FROM pipelines p
-    JOIN oban_jobs j ON json_extract(j.args, '$.pipeline_id') = p.id
-      AND j.worker LIKE '%TranscribeWorker' AND j.state = 'available'
-    WHERE p.status = 'running' AND p.current_step = 'transcribe'
-    ORDER BY j.priority ASC, j.scheduled_at ASC
-    LIMIT ?
-    """
+  defp next_transcribe(waiting, limit \\ 5) do
+    waiting |> Enum.take(limit) |> queue_entries() |> Enum.map(& &1.title)
+  end
 
-    {:ok, %{rows: rows}} = Repo.query(sql, [limit])
-    Enum.map(rows, fn [results] -> title_from_results(results) end)
+  # Cada job à espera, na ordem prevista de liberação, com a lane (`general` ou
+  # o batch_id) e o estado (`released` = já na fila do Oban; `gated` = no portão).
+  defp queue_entries(waiting) do
+    titles = titles_for(Enum.map(waiting, & &1.pipeline_id))
+
+    Enum.map(waiting, fn w ->
+      %{
+        title: Map.get(titles, w.pipeline_id, "?"),
+        lane: w.lane,
+        state: w.state,
+        prioritized: w.prioritized
+      }
+    end)
+  end
+
+  # Lanes com trabalho (à espera ou executando) e o último despacho de cada uma.
+  defp lanes(waiting) do
+    executing = TranscribeFeeder.executing_by_lane()
+    served = TranscribeFeeder.last_served()
+    waiting_counts = Enum.frequencies_by(waiting, & &1.lane)
+
+    (Map.keys(waiting_counts) ++ Map.keys(executing))
+    |> Enum.uniq()
+    |> Enum.sort()
+    |> Enum.map(fn lane ->
+      %{
+        lane: lane,
+        waiting: Map.get(waiting_counts, lane, 0),
+        executing: Map.get(executing, lane, 0),
+        last_served_at: served |> Map.get(lane) |> unix_to_iso()
+      }
+    end)
+  end
+
+  defp unix_to_iso(nil), do: nil
+  defp unix_to_iso(ts), do: ts |> DateTime.from_unix!() |> DateTime.to_iso8601()
+
+  defp titles_for([]), do: %{}
+
+  defp titles_for(ids) do
+    Repo.all(from p in Pipeline, where: p.id in ^ids, select: {p.id, p.results})
+    |> Map.new(fn {id, results} -> {id, title_from_results(results)} end)
   end
 
   defp executing_jobs do
     sql = """
-    SELECT json_extract(j.args, '$.pipeline_id'), p.results
+    SELECT json_extract(j.args, '$.pipeline_id'), p.results,
+      coalesce(json_extract(j.meta, '$.lane'), 'general')
     FROM oban_jobs j
     JOIN pipelines p ON p.id = json_extract(j.args, '$.pipeline_id')
     WHERE j.worker LIKE '%TranscribeWorker' AND j.state = 'executing'
@@ -119,11 +153,12 @@ defmodule Toscanini.Status do
 
     {:ok, %{rows: rows}} = Repo.query(sql)
 
-    Enum.map(rows, fn [pid, results] ->
+    Enum.map(rows, fn [pid, results, lane] ->
       prog = read_progress(pid)
 
       %{
         title:  title_from_results(results),
+        lane:   lane,
         device: if(String.contains?(prog.model, "cuda"), do: "GPU", else: "CPU"),
         pct:    prog.progress,
         eta:    prog.eta

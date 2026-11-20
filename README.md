@@ -79,7 +79,7 @@ curl http://localhost:8080/api/orchestrator/batch/:id
 # Find pipeline by URL
 curl http://localhost:8080/api/orchestrator/pipelines/find?url=...
 
-# Prioritize a job (move to front of transcribe queue)
+# Prioritize a job (released before any lane of the transcribe gate)
 curl -X POST http://localhost:8080/api/orchestrator/pipelines/:id/prioritize
 
 # Publish from pre-processed JSON (skips collect/transcribe/summarize)
@@ -126,6 +126,19 @@ The scheduler controls concurrency, GPU access, and CPU thread count per time wi
 - **cores**: CPU threads passed to faster-whisper (default: 14)
 - **days** (optional): days the window applies to (`mon`..`sun`); without it the window applies every day. The first window matching hour and day wins, so put day-specific windows first
 
+### Transcription queue lanes
+
+Transcribe jobs do not enter the Oban queue directly. `Toscanini.TranscribeFeeder` holds them in a gate
+(state `scheduled`, far-future `scheduled_at`) tagged with a **lane** in `meta.lane`: `general` for single
+episodes, the `batch_id` for batch items. Whenever a whisper slot is free (window `limit` minus `executing`
+and `available` jobs), the feeder releases the oldest job of the lane that has waited longest since its
+last dispatch, skipping lanes with nothing ready. With one batch and 2 slots the batch gets about half the
+machine; with no batch, single episodes get everything, as before. The feeder runs on job completion
+(telemetry), on new jobs, and every minute from cron. On boot every `available` transcribe job is put back
+in the gate so a restart keeps the lane order. `GET /status` exposes `queue` (each waiting job with lane and
+`released`/`gated` state) and `lanes` (`waiting`, `executing`, `last_served_at`). `POST /pipelines/:id/prioritize`
+marks a job to be released before any lane.
+
 GPU access is serialized via `/tmp/whisper-gpu.lock` (PID-based, with stale lock detection).
 
 **VRAM check.** large-v3 float16 uses ~5 GB of the 6 GB card, so anything else on the GPU makes it die with `CUDA out of memory`. After taking the GPU lock the worker waits up to 20 s for the previous job to release its VRAM, and if less than `WHISPER_MIN_FREE_VRAM_MB` (default 4600) is free it releases the lock and goes to the CPU instead of starting just to crash. `WHISPER_VRAM_WAIT_SECS` changes the grace period.
@@ -158,7 +171,7 @@ The `toscanini-mcp/` directory contains a TypeScript MCP server exposing all orc
 | `get_job` / `get_batch` | Poll status |
 | `wait_job` / `wait_batch` | Block until completion |
 | `find_job_by_url` | Search by episode URL |
-| `prioritize_job` | Move to front of queue |
+| `prioritize_job` | Release before any lane of the transcribe gate |
 | `publish_podcast` | Publish from pre-processed JSON |
 | `get_scheduler_config` | Read queue schedule windows |
 | `set_scheduler_config` | Update schedule (limit, gpu, cores) |

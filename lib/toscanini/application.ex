@@ -4,11 +4,15 @@ defmodule Toscanini.Application do
   @impl true
   def start(_type, _args) do
     Toscanini.ObanNotifier.attach()
+    Toscanini.TranscribeFeeder.attach()
 
     children = [
       Toscanini.Repo,
       # Antes do Oban: jobs que ficaram executing num restart voltam para a fila.
       Toscanini.ObanRescue,
+      # Depois do resgate, antes do Oban: todo transcribe available volta ao portão
+      # e o feeder libera por lane (geral x lotes).
+      Toscanini.TranscribeFeeder,
       {Oban, Application.fetch_env!(:toscanini, Oban)},
       ToscaniniWeb.Endpoint
     ]

@@ -1,9 +1,18 @@
 defmodule ToscaniniWeb.PipelineController do
   use ToscaniniWeb, :controller
 
+  # Marca prioridade nos jobs do pipeline ainda não iniciados. No portão do
+  # TranscribeFeeder, `meta.prioritized` sai antes de qualquer lane; já liberado
+  # (ou noutra fila), `priority = -1` passa à frente dos demais `available`.
   def prioritize(conn, %{"id" => pipeline_id}) do
-    sql = "UPDATE oban_jobs SET priority = -1 WHERE state = 'available' AND json_extract(args, '$.pipeline_id') = ?"
+    sql = """
+    UPDATE oban_jobs
+    SET priority = -1, meta = json_set(coalesce(meta, '{}'), '$.prioritized', json('true'))
+    WHERE state IN ('available', 'scheduled') AND json_extract(args, '$.pipeline_id') = ?
+    """
+
     {:ok, %{num_rows: count}} = Toscanini.Repo.query(sql, [pipeline_id])
+    Toscanini.TranscribeFeeder.run()
     json(conn, %{ok: true, pipeline_id: pipeline_id, updated: count})
   end
 
