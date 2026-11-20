@@ -404,8 +404,10 @@ const TOOLS = [
       "YouTube: pass a channel URL (@handle, /channel/UC..., /c/, /user/) or any video URL of the channel " +
       "(source is inferred, the channel id UC... is stored); only long videos are followed (no Shorts, no lives), " +
       "and a scheduled premiere holds the channel until it airs. " +
-      "check_days sets the hot window (hourly polling on those weekdays); outside it a daily safety " +
-      "poll runs. Conditional GET (ETag) keeps polling cheap.",
+      "check_days sets the hot window (polling every hot_interval_min on those weekdays). Outside it, and " +
+      "always when check_days is empty, only the safety net runs, at the UTC anchor hours in get_feeds_config " +
+      "(default 03:00 and 15:00). Omitted = days inferred from the feed cadence at subscribe time " +
+      "([] when the feed has no fixed publishing days). Conditional GET (ETag) keeps polling cheap.",
     inputSchema: {
       type: "object",
       properties: {
@@ -429,7 +431,7 @@ const TOOLS = [
         check_days: {
           type: "array",
           items: { type: "string" },
-          description: "Weekday abbreviations for the hot window, e.g. ['mon','fri']. Empty/omitted = hot always on.",
+          description: "Weekday abbreviations for the hot window, e.g. ['mon','fri']. [] = no hot window, safety net only (03:00/15:00 UTC by default). Omitted = inferred from the feed cadence.",
         },
         hot_interval_min: {
           type: "number",
@@ -467,7 +469,7 @@ const TOOLS = [
         check_days: {
           type: "array",
           items: { type: "string" },
-          description: "Weekday abbreviations for the hot window, e.g. ['mon','fri']. [] = hot always on.",
+          description: "Weekday abbreviations for the hot window, e.g. ['mon','fri']. [] = no hot window, safety net only (03:00/15:00 UTC by default).",
         },
         hot_interval_min: { type: "number", description: "Minutes between checks inside the hot window." },
         idle_interval_min: { type: "number", description: "Minutes between safety checks outside the hot window." },
