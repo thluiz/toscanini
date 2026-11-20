@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.59] — 2026-11-20
+
+### Lotes ativos no `GET /status`
+
+Um lote grande (199 episódios) ficava invisível no status: só aparecia o episódio da vez.
+
+- **`batches`** no snapshot (`Toscanini.Status.active_batches/0`) — um item por lote `running`: `total`, `done`,
+  `failed`, `pending` (contados em `batch_items`, porque `batches.done/failed` somam retentativas), `current`
+  (`position`, `title`, `step` do episódio da vez), `started_at`, `eta_secs` (tempo médio por item concluído ×
+  itens restantes; `null` até o primeiro terminar) e `idle_secs` (segundos desde o último item concluído, ou desde o
+  início: número alto num lote `running` = lote parado).
+
 ## [0.2.58] — 2026-11-20
 
 ### Duração divergente do feed vira erro específico, com override

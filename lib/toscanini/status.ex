@@ -15,7 +15,8 @@ defmodule Toscanini.Status do
       recent_failures: recent_failures(),
       transcribe:      transcribe_status(),
       next_transcribe: next_transcribe(),
-      executing:       executing_jobs()
+      executing:       executing_jobs(),
+      batches:         active_batches()
     }
   end
 
@@ -129,6 +130,72 @@ defmodule Toscanini.Status do
       }
     end)
   end
+
+  # Running batches, counted from batch_items: `batches.done/failed` also count
+  # retries (done + failed can exceed total). ETA = mean time per finished item
+  # in this batch x items left; nil until the first item finishes.
+  @doc false
+  def active_batches do
+    sql = """
+    SELECT b.id, b.total, b.inserted_at,
+      SUM(i.status = 'done'), SUM(i.status = 'failed'), SUM(i.status = 'pending'),
+      SUM(i.status = 'running'),
+      MIN(i.started_at), MAX(CASE WHEN i.status IN ('done','failed') THEN i.completed_at END),
+      (SELECT p.results FROM batch_items r JOIN pipelines p ON p.id = r.pipeline_id
+        WHERE r.batch_id = b.id AND r.status = 'running' ORDER BY r.position LIMIT 1),
+      (SELECT p.current_step FROM batch_items r JOIN pipelines p ON p.id = r.pipeline_id
+        WHERE r.batch_id = b.id AND r.status = 'running' ORDER BY r.position LIMIT 1),
+      (SELECT MAX(r.position) FROM batch_items r WHERE r.batch_id = b.id AND r.status = 'running')
+    FROM batches b JOIN batch_items i ON i.batch_id = b.id
+    WHERE b.status = 'running'
+    GROUP BY b.id
+    ORDER BY b.inserted_at
+    """
+
+    {:ok, %{rows: rows}} = Repo.query(sql)
+    now = NaiveDateTime.utc_now()
+
+    Enum.map(rows, fn [id, total, inserted, done, failed, pending, running, first_start, last_end,
+                       cur_results, cur_step, cur_pos] ->
+      finished = (done || 0) + (failed || 0)
+      left = (pending || 0) + (running || 0)
+
+      %{
+        id:         id,
+        total:      total,
+        done:       done || 0,
+        failed:     failed || 0,
+        pending:    pending || 0,
+        current:    if(running && running > 0, do: %{position: cur_pos, title: title_from_results(cur_results), step: cur_step}),
+        started_at: first_start || inserted,
+        idle_secs:  idle_secs(last_end || first_start || inserted, now),
+        eta_secs:   eta_secs(first_start, last_end, finished, left)
+      }
+    end)
+  end
+
+  defp eta_secs(first_start, last_end, finished, left)
+       when is_binary(first_start) and is_binary(last_end) and finished > 0 and left > 0 do
+    with {:ok, a} <- NaiveDateTime.from_iso8601(first_start),
+         {:ok, b} <- NaiveDateTime.from_iso8601(last_end) do
+      round(NaiveDateTime.diff(b, a) / finished * left)
+    else
+      _ -> nil
+    end
+  end
+
+  defp eta_secs(_, _, _, _), do: nil
+
+  # Seconds since the batch last moved (last item finished, or start): a big
+  # number on a running batch means it is stuck.
+  defp idle_secs(ts, now) when is_binary(ts) do
+    case NaiveDateTime.from_iso8601(ts) do
+      {:ok, t} -> NaiveDateTime.diff(now, t)
+      _ -> nil
+    end
+  end
+
+  defp idle_secs(_, _), do: nil
 
   defp read_progress(pid) do
     default = %{model: "?", progress: "?", eta: "?"}
