@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.2.61] — 2026-11-20
+
+### Retry e snooze voltam ao portão da fila de transcrição
+
+No restart para a 0.2.60 o whisper dos dois jobs em curso morreu (exit 143) e o Oban os marcou `retryable`; passado o
+backoff, o Stager os devolveu como `available` por fora do portão, na frente de todas as lanes e sem `meta.lane`. O
+mesmo valia para qualquer falha com tentativa sobrando e para o snooze do cooldown da GPU.
+
+- **`TranscribeFeeder.regate/0`** — no início de cada `run/1`, todo job `retryable` ou `available` já tentado
+  (`attempted_at` preenchido) volta ao portão com a lane (do `meta`, senão do pipeline) e re-entra pela rotação. Um job
+  que o feeder acabou de liberar nunca foi tentado, então não é tocado. `adopt/0` (boot) e `regate/0` partilham
+  `gate_jobs/1`.
+- Testes: retryable e available-já-tentado voltam ao portão; liberado-não-tentado fica; `run/1` serve o lote nunca
+  servido antes do retry da geral.
+
 ## [0.2.60] — 2026-11-20
 
 ### Fila de transcrição com lanes: lotes e avulsos revezam

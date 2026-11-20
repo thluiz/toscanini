@@ -88,23 +88,38 @@ defmodule Toscanini.TranscribeFeeder do
   def gate_opts(lane), do: [scheduled_at: @gate_at, meta: %{"lane" => lane}]
 
   @doc """
-  Devolve ao portão todo job `available` da fila transcribe, preenchendo `meta.lane`
-  a partir do pipeline quando falta (jobs da versão sem portão). Retorna os ids.
+  Boot: devolve ao portão todo job `available` da fila transcribe, preenchendo
+  `meta.lane` a partir do pipeline quando falta (jobs da versão sem portão). Retorna os ids.
   """
   def adopt do
-    rows =
-      Repo.all(
-        from j in Oban.Job,
-          where: j.queue == @queue and j.state == "available",
-          select: {j.id, j.args, j.meta}
-      )
+    gate_jobs(from j in Oban.Job, where: j.queue == @queue and j.state == "available")
+  end
 
-    for {id, args, meta} <- rows do
+  @doc """
+  Jobs que voltaram à fila por fora do portão e vão re-entrar pela lane: `retryable`
+  (falha com tentativa sobrando, inclusive o whisper morto num restart) e `available`
+  já tentado (`attempted_at` preenchido: snooze do cooldown da GPU, ou retry que o
+  Stager já liberou). Um job que o feeder acabou de liberar nunca foi tentado, então
+  não é tocado. Sem isto um retry entrava na fila na frente das lanes.
+  """
+  def regate do
+    gate_jobs(
+      from j in Oban.Job,
+        where:
+          j.queue == @queue and
+            (j.state == "retryable" or (j.state == "available" and not is_nil(j.attempted_at)))
+    )
+  end
+
+  defp gate_jobs(query) do
+    rows = Repo.all(from j in query, select: {j.id, j.state, j.args, j.meta})
+
+    for {id, state, args, meta} <- rows do
       meta = meta || %{}
       lane = meta["lane"] || lane_from_pipeline(args["pipeline_id"])
 
       Repo.update_all(
-        from(j in Oban.Job, where: j.id == ^id and j.state == "available"),
+        from(j in Oban.Job, where: j.id == ^id and j.state == ^state),
         set: [state: "scheduled", scheduled_at: @gate_at, meta: Map.put(meta, "lane", lane)]
       )
 
@@ -125,6 +140,7 @@ defmodule Toscanini.TranscribeFeeder do
 
   @doc "Libera jobs do portão até preencher os slots livres. Retorna os ids liberados."
   def run(limit \\ current_limit()) do
+    regate()
     free = limit - busy_count()
 
     if free <= 0 do

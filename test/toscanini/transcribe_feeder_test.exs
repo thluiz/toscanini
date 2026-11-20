@@ -187,6 +187,40 @@ defmodule Toscanini.TranscribeFeederTest do
     end
   end
 
+  describe "regate/0 (retry e snooze voltam ao portão)" do
+    test "retryable volta ao portão e re-entra pela lane" do
+      lote = pipeline!(%{"batch_id" => "B", "batch_item_id" => 1})
+      r = job!(lote.id, "retryable", nil, attempted_at: @t10, scheduled_at: @t12)
+
+      assert TranscribeFeeder.regate() == [r.id]
+      r = reload(r)
+      assert gated?(r)
+      assert r.meta["lane"] == "B"
+    end
+
+    test "available já tentado (snooze / retry liberado pelo Stager) volta ao portão" do
+      s = job!(pipeline!().id, "available", "general", attempted_at: @t10, scheduled_at: @t12)
+      assert TranscribeFeeder.regate() == [s.id]
+      assert gated?(reload(s))
+    end
+
+    test "job que o feeder acabou de liberar (nunca tentado) não volta ao portão" do
+      a = available!("general", @t12)
+      assert TranscribeFeeder.regate() == []
+      assert reload(a).state == "available"
+    end
+
+    test "run/1 re-encaixa o retry na rotação em vez de o deixar na frente das lanes" do
+      completed!("general", @t12)
+      # retry da geral chega de volta (fora do portão) e um item de lote nunca servido espera
+      r = job!(pipeline!().id, "available", "general", attempted_at: @t11, scheduled_at: @t12)
+      b = gated!("b1")
+
+      assert TranscribeFeeder.run(1) == [b.id]
+      assert gated?(reload(r))
+    end
+  end
+
   describe "Dispatcher" do
     test "transcribe entra no portão com a lane do lote" do
       # Ocupa todos os slots possíveis para o feeder não liberar na hora.
